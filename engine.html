@@ -664,7 +664,7 @@ function generateTableRows(count, rowGenerator) {
                 if (!waybills) {
                     // ★★★ 修正：默认全是“待结算”，模拟真实业务场景 ★★★
                     waybills = [
-                        { id: 'YD202511001', client: '阳光制造', date: '2025-11-18', amount: '1,200.00', status: '待结算', details: {'运费':1200} },
+                        { id: 'YD202511001', client: '阳光制造', date: '2025-11-18', amount: '1200.00', status: '待结算', details: {'运费':1200} },
                         { id: 'YD202511002', client: '张三个人', date: '2025-11-19', amount: '500.00', status: '待结算', details: {'运费':400, '提货费':100} },
                         { id: 'YD202511003', client: 'EASY贸易', date: '2025-11-19', amount: '2,500.00', status: '待结算', details: {'运费':2500} }
                     ];
@@ -972,61 +972,160 @@ function generateTableRows(count, rowGenerator) {
             }      
             
 
-// =========================================================================
-            // 2. 客户对账 (ReconCustomer) - [终极版：含明细查看]
-            // =========================================================================
-            else if (moduleCode === 'ReconCustomer') {
-                let recons = JSON.parse(sessionStorage.getItem('CustomerRecons'));
-                if (!recons) {
-                    recons = [{ id: 'DZ202511-001', client: '阳光制造有限公司', period: '2025-11', amount: '100,000.00', status: '待客户确认', waybillCount: 5 }];
-                    sessionStorage.setItem('CustomerRecons', JSON.stringify(recons));
-                }
-
-                const rows = recons.map(r => {
-                    let statusColor = '#333';
-                    let action = '';
-
-                    // 状态逻辑
-                    if (r.status === '待客户确认') {
-                        statusColor = '#f39c12';
-                        action = `<a href="javascript:void(0)" onclick="confirmRecon('${r.id}')" style="color:#27ae60; font-weight:bold;">模拟确认</a>`;
-                    } else if (r.status === '已确认') {
-                        statusColor = '#27ae60';
-                        action = `<button onclick="applyInvoiceFromRecon('${r.id}', '${r.client}', '${r.amount}')" class="btn-primary" style="padding:4px 8px; font-size:12px;">申请开票</button>`;
-                    } else if (r.status === '已开票') { // ★★★ 新增状态 ★★★
-                        statusColor = '#2980b9'; // 蓝色
-                        action = `<span style="color:#999;">开票完成</span>`;
-                    } else {
-                        statusColor = '#999';
-                        action = `<span style="color:#ccc;">处理中</span>`;
-                    }
-
-                    return `<tr>
-                        <td>
-                            <a href="javascript:void(0)" onclick="viewReconDetails('${r.id}')" style="color:#3498db; font-weight:bold;">${r.id}</a>
-                            <span style="font-size:12px; color:#999; margin-left:5px;">(${r.waybillCount || '-'}单)</span>
-                        </td>
-                        <td>${r.client}</td>
-                        <td>${r.period}</td>
-                        <td style="text-align:right; font-weight:bold;">${r.amount}</td>
-                        <td><span style="color:${statusColor}; font-weight:bold;">${r.status}</span></td>
-                        <td>${action}</td>
-                    </tr>`;
-                }).join('');
-
-                contentHTML += `
-                    <h2>客户对账 (Customer Reconciliation)</h2>
-                    <div class="filter-area" style="background:white;padding:15px;margin-bottom:20px;">
-                        <button class="btn-primary" onclick="loadContent('ReconCustomer')">刷新列表</button>
-                    </div>
-                    <table class="data-table">
-                        <thead><tr><th>对账单号 (点号看明细)</th><th>客户名称</th><th>对账期间</th><th style="text-align:right;">应收金额</th><th>状态</th><th>操作</th></tr></thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                `;
+else if (moduleCode === 'ReconCustomer') {
+    let recons = JSON.parse(sessionStorage.getItem('CustomerRecons'));
+    if (!recons) {
+        recons = [
+            { 
+                id: 'DZ202511-001', 
+                client: '阳光制造有限公司', 
+                period: '2025-11', 
+                amount: '100,000.00', 
+                status: '待客户确认',
+                details: [ // 默认明细
+                    { waybillId: 'YD202511001', date: '2025-11-18', amount: '50,000.00' },
+                    { waybillId: 'YD202511002', date: '2025-11-19', amount: '50,000.00' }
+                ]
+            },
+            { 
+                id: 'DZ202511-002', 
+                client: 'EASY贸易公司', 
+                period: '2025-11', 
+                amount: '50,000.00', 
+                status: '已确认',
+                details: [
+                    { waybillId: 'YD202511003', date: '2025-11-20', amount: '50,000.00' }
+                ]
             }
+        ];
+        sessionStorage.setItem('CustomerRecons', JSON.stringify(recons));
+    }
 
+    const rows = recons.map(r => {
+        let statusColor = '#333';
+        let action = '';
 
+        if (r.status === '待客户确认') {
+            statusColor = '#f39c12';
+            action = `<a href="javascript:void(0)" onclick="confirmRecon('${r.id}')" style="color:#27ae60; font-weight:bold;">模拟客户确认</a>`;
+        } 
+        else if (r.status === '已确认') {
+            statusColor = '#27ae60';
+            action = `<button onclick="applyInvoiceFromRecon('${r.id}', '${r.client}', '${r.amount}')" class="btn-primary" style="padding:4px 8px; font-size:12px;">申请开票</button>`;
+        } 
+        else if (r.status === '开票中' || r.status === '已开票') {
+            statusColor = '#999';
+            action = `<span style="color:#ccc">已推送到税务</span>`;
+        }
+
+        // ⭐ 新增：查看明细按钮
+        const detailBtn = `<a href="javascript:void(0)" onclick="viewReconDetail('${r.id}')" style="color:#3498db; margin-left:10px;">📋 查看明细</a>`;
+
+        return `<tr>
+            <td>${r.id}</td>
+            <td>${r.client}</td>
+            <td>${r.period}</td>
+            <td style="text-align:right; font-weight:bold;">${r.amount}</td>
+            <td><span style="color:${statusColor}; font-weight:bold;">${r.status}</span></td>
+            <td>${action} ${detailBtn}</td>
+        </tr>`;
+    }).join('');
+
+    contentHTML += `
+        <h2>客户对账 (Customer Reconciliation)</h2>
+        <p style="color: #7f8c8d;">标准流程：生成对账单 → 等待客户确认 → 确认后申请开票。</p>
+        
+        <div class="filter-area" style="background:white;padding:15px;margin-bottom:20px;">
+            <button class="btn-primary" onclick="loadContent('ReconCustomer')">刷新列表</button>
+        </div>
+
+        <table class="data-table">
+            <thead><tr>
+                <th>对账单号</th>
+                <th>客户名称</th>
+                <th>对账期间</th>
+                <th style="text-align:right;">应收金额</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+// =========================================================================
+// 对账单明细页 (ReconDetail) - 新增模块
+// =========================================================================
+else if (moduleCode === 'ReconDetail') {
+    const reconId = sessionStorage.getItem('CurrentReconId');
+    const recons = JSON.parse(sessionStorage.getItem('CustomerRecons') || "[]");
+    const recon = recons.find(r => r.id === reconId);
+    
+    if (!recon) {
+        contentHTML += `<h2>对账单明细</h2><p style="color:#e74c3c;">未找到对账单数据，请返回列表重试。</p>`;
+    } else {
+        // 生成明细行
+        const detailRows = (recon.details || []).map((item, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${item.waybillId}</td>
+                <td>${item.date}</td>
+                <td style="text-align:right; font-weight:bold;">${item.amount}</td>
+                <td><span style="color:#27ae60;">已结算</span></td>
+            </tr>
+        `).join('');
+
+        contentHTML += `
+            <div style="margin-bottom:20px;">
+                <button class="btn-primary" style="background-color: #95a5a6;" onclick="loadContent('ReconCustomer')"> ← 返回对账列表</button>
+                <button class="btn-primary" style="background-color: #3498db; margin-left:10px;" onclick="window.print()">🖨 打印对账单</button>
+            </div>
+
+            <div style="background:white; padding:30px; border-radius:8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h2 style="border-bottom:2px solid #3498db; padding-bottom:10px;">客户对账单</h2>
+                
+                <div style="display:flex; justify-content:space-between; margin:20px 0; padding:15px; background:#f9f9f9; border-radius:4px;">
+                    <div>
+                        <div style="margin-bottom:8px;"><strong>对账单号：</strong>${recon.id}</div>
+                        <div><strong>客户名称：</strong>${recon.client}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="margin-bottom:8px;"><strong>对账期间：</strong>${recon.period}</div>
+                        <div><strong>生成时间：</strong>${recon.createTime || '2025-11-24'}</div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top:30px;">运单明细列表</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width:8%;">序号</th>
+                            <th style="width:25%;">运单号</th>
+                            <th style="width:20%;">运单日期</th>
+                            <th style="text-align:right; width:20%;">金额 (RMB)</th>
+                            <th style="width:15%;">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${detailRows}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:#f0f0f0; font-weight:bold;">
+                            <td colspan="3" style="text-align:right; padding-right:20px;">合计：</td>
+                            <td style="text-align:right; font-size:16px; color:#e74c3c;">¥${recon.amount}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div style="margin-top:30px; padding:15px; background:#e8f5e9; border-left:4px solid #27ae60; border-radius:4px;">
+                    <div style="margin-bottom:5px;"><strong>📌 对账说明：</strong></div>
+                    <div style="color:#666;">本对账单包含 ${(recon.details || []).length} 笔运单，总金额 ¥${recon.amount}，请核对无误后确认。</div>
+                </div>
+            </div>
+        `;
+    }
+}
             // =========================================================================
             // 3. 承运商对账 (ReconCarrier)
             // =========================================================================
@@ -7641,47 +7740,89 @@ function numberToChinese(money) {
         loadContent('SettlementWaybill');
     }
 
-/** 2. 生成对账单 (包含正负单据，为了账目平衡) */
-    window.createReconBill = function() {
-        if(!confirm("确认将选中的【已结算】运单(含退款抵扣)合并生成对账单吗？")) return;
-        
-        let list = JSON.parse(sessionStorage.getItem('BizWaybills') || "[]");
-        let totalAmount = 0;
-        let count = 0;
-        let hasSettled = false;
-        
-        list.forEach(i => {
-            if(i.status === '已结算') {
-                let amt = parseFloat(i.amount.toString().replace(/,/g, ''));
-                totalAmount += amt;
-                i.status = '对账中'; 
-                hasSettled = true;
-                count++;
-            }
-        });
-
-        if(!hasSettled) return alert("⚠️ 没有【已结算】的运单。请先点击“计算费用”。");
-
-        sessionStorage.setItem('BizWaybills', JSON.stringify(list));
-
-        // 生成对账单
-        let recons = JSON.parse(sessionStorage.getItem('CustomerRecons') || "[]");
-        const newId = 'DZ' + new Date().getFullYear() + Math.floor(Math.random()*1000);
-        
-        recons.unshift({
-            id: newId,
-            client: '批量生成客户',
-            period: '2025-11',
-            amount: totalAmount.toFixed(2), // 这里的金额是 (原价 - 退款) 后的净额
-            status: '待客户确认',
-            waybillCount: count
-        });
-        sessionStorage.setItem('CustomerRecons', JSON.stringify(recons));
-
-        alert(`✅ 对账单已生成！\n单号：${newId}\n\n包含 ${count} 笔单据 (含退款项)\n对账总额：${totalAmount.toFixed(2)}`);
-        loadContent('ReconCustomer');
-    }
+// 模拟生成对账单 (从结算页跳转到对账页) - 修复版：保存明细
+window.createReconBill = function() {
+    // 1. 获取所有【已结算】的运单
+    let waybills = JSON.parse(sessionStorage.getItem('BizWaybills') || "[]");
+    let settledBills = waybills.filter(w => w.status === '已结算');
     
+    if (settledBills.length === 0) {
+        alert("⚠️ 没有【已结算】的运单，无法生成对账单。");
+        return;
+    }
+
+    // 2. 按客户分组（真实场景应该按客户分组，这里简化为批量处理）
+    const customerGroups = {};
+    settledBills.forEach(bill => {
+        const client = bill.client;
+        if (!customerGroups[client]) {
+            customerGroups[client] = [];
+        }
+        customerGroups[client].push(bill);
+    });
+
+    // 3. 为每个客户生成一张对账单
+    let recons = JSON.parse(sessionStorage.getItem('CustomerRecons') || "[]");
+    
+    Object.keys(customerGroups).forEach(client => {
+        const bills = customerGroups[client];
+        
+        // 计算总金额
+        const totalAmount = bills.reduce((sum, b) => {
+            return sum + parseFloat(b.amount.replace(/,/g, ''));
+        }, 0);
+
+        // 生成对账单ID
+        const newReconId = 'DZ' + new Date().getFullYear() + 
+                          String(new Date().getMonth() + 1).padStart(2, '0') + 
+                          '-' + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+        
+        // ⭐ 核心修复：保存完整的运单明细
+        const newRecon = {
+            id: newReconId,
+            client: client,
+            period: '2025-11',
+            amount: totalAmount.toFixed(2),
+            status: '待客户确认',
+            createTime: new Date().toLocaleString(),
+            // ⭐ 新增：保存运单明细列表
+            details: bills.map(b => ({
+                waybillId: b.id,
+                date: b.date,
+                amount: b.amount,
+                status: b.status
+            }))
+        };
+        
+        recons.unshift(newRecon);
+        
+        // 更新运单状态为"对账中"
+        bills.forEach(b => {
+            b.status = '对账中';
+            b.reconId = newReconId; // 关联对账单号
+        });
+    });
+
+    // 4. 保存数据
+    sessionStorage.setItem('CustomerRecons', JSON.stringify(recons));
+    sessionStorage.setItem('BizWaybills', JSON.stringify(waybills));
+
+    alert(`✅ 对账单生成成功！\n共生成 ${Object.keys(customerGroups).length} 张对账单。`);
+    loadContent('ReconCustomer'); // 跳转到客户对账
+}
+
+// ==========================================================
+// 查看对账单明细
+// ==========================================================
+window.viewReconDetail = function(reconId) {
+    console.log("🔍 [调试] 查看对账单明细:", reconId);
+    
+    // 保存当前查看的对账单ID
+    sessionStorage.setItem('CurrentReconId', reconId);
+    
+    // 跳转到明细页
+    loadContent('ReconDetail');
+}
     
     
 
