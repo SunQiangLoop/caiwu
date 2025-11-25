@@ -666,7 +666,7 @@ function generateTableRows(count, rowGenerator) {
                     waybills = [
                         { id: 'YD202511001', client: '阳光制造', date: '2025-11-18', amount: '1200.00', status: '待结算', details: {'运费':1200} },
                         { id: 'YD202511002', client: '张三个人', date: '2025-11-19', amount: '500.00', status: '待结算', details: {'运费':400, '提货费':100} },
-                        { id: 'YD202511003', client: 'EASY贸易', date: '2025-11-19', amount: '2,500.00', status: '待结算', details: {'运费':2500} }
+                        { id: 'YD202511003', client: 'EASY贸易', date: '2025-11-19', amount: '2.00', status: '待结算', details: {'运费':2500} }
                     ];
                     sessionStorage.setItem('BizWaybills', JSON.stringify(waybills));
                 }
@@ -976,25 +976,25 @@ else if (moduleCode === 'ReconCustomer') {
     let recons = JSON.parse(sessionStorage.getItem('CustomerRecons'));
     if (!recons) {
         recons = [
-            { 
+            /* { 
                 id: 'DZ202511-001', 
                 client: '阳光制造有限公司', 
                 period: '2025-11', 
-                amount: '100,000.00', 
+                amount: '1200.00', 
                 status: '待客户确认',
                 details: [ // 默认明细
                     { waybillId: 'YD202511001', date: '2025-11-18', amount: '50,000.00' },
                     { waybillId: 'YD202511002', date: '2025-11-19', amount: '50,000.00' }
                 ]
-            },
+            }, */
             { 
                 id: 'DZ202511-002', 
                 client: 'EASY贸易公司', 
                 period: '2025-11', 
-                amount: '50,000.00', 
+                amount: '2.00', 
                 status: '已确认',
                 details: [
-                    { waybillId: 'YD202511003', date: '2025-11-20', amount: '50,000.00' }
+                    { waybillId: 'YD202511003', date: '2025-11-20', amount: '2.00' }
                 ]
             }
         ];
@@ -2762,66 +2762,58 @@ else if (moduleCode === 'ReconDetail') {
 
             
 // =========================================================================
-            // 22. 发票详情页 (InvoiceDetail) - [UI 升级版：高仿真电子发票]
+            // 22. 发票详情页 (InvoiceDetail) - [终极修正版：自动算税 + 完美UI]
             // =========================================================================
             else if (moduleCode === 'InvoiceDetail') {
-                
-                // 1. 获取数据
-                const inv = window.g_currentInvoice || {
-                    no: '25342000000202203928', 
-                    date: '2025年11月20日',
-                    clientName: '演示客户公司',
-                    clientTaxId: '91320192MA1MPF0576',
-                    sellerName: '乐享物流有限公司',
-                    sellerTaxId: '91310000MA3K1D8W01',
-                    amount: '1,000.00',
-                    taxRate: '9%',
-                    tax: '90.00',
-                    total: '1,090.00',
-                    totalCn: '壹仟零玖拾圆整'
+                // 1. 获取基础数据
+                let inv = window.g_currentInvoice || {
+                    no: '253420000002', date: '2025年11月24日',
+                    clientName: '演示客户公司', clientTaxId: '9132xxxxxxxx',
+                    sellerName: '乐享物流有限公司', sellerTaxId: '9131xxxxxxxx',
+                    amount: '1,000.00' // 基础金额
                 };
 
-                // 发票专用色
-                const inkColor = '#9c5223'; 
-                
-                // 如果没有大写金额，尝试自动转换
-                if (!inv.totalCn || inv.totalCn === '(自动计算大写金额)') {
-                    if (typeof convertCurrency === 'function') {
-                        inv.totalCn = convertCurrency(inv.total.replace(/,/g, ''));
-                    } else {
-                        inv.totalCn = '（大写金额生成失败）';
-                    }
-                }
+                // 2. ★★★ 核心修复：强制重新计算税额和总价 ★★★
+                // 去掉逗号转数字
+                const rawAmount = parseFloat(inv.amount.toString().replace(/,/g, '')) || 0;
+                const taxRateVal = 0.09; // 9% 税率
+                const rawTax = rawAmount * taxRateVal;
+                const rawTotal = rawAmount + rawTax;
 
+                // 格式化回字符串 (保留2位小数)
+                inv.amount = rawAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                inv.taxRate = '9%';
+                inv.tax = rawTax.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                inv.total = rawTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                // 生成大写金额
+                inv.totalCn = (typeof convertCurrency === 'function') ? convertCurrency(rawTotal) : '（金额计算中...）';
+
+                // 发票专用色 (深红褐色)
+                const inkColor = '#b15b36'; 
+                const borderStyle = `1px solid ${inkColor}`;
+                
                 contentHTML += `
                     <div style="margin-bottom:20px; display:flex; justify-content:space-between;">
                         <button class="btn-primary" style="background-color: #95a5a6;" onclick="loadContent('TaxOutputInvoice')"> < 返回列表</button>
                         <div>
-                            <button class="btn-primary" style="background-color: #3498db;">🖨 打印</button>
-                            <button class="btn-primary" style="background-color: #27ae60;">下载 OFD</button>
+                            <button class="btn-primary" style="background-color: #3498db;">🖨 打印发票</button>
+                            <button class="btn-primary" style="background-color: #27ae60;">下载 PDF</button>
                         </div>
                     </div>
 
-                    <div style="background: #fff; padding: 30px 40px; border: 1px solid #e0e0e0; width: 1000px; margin: 0 auto; box-shadow: 0 5px 20px rgba(0,0,0,0.05); position:relative; font-family: 'SimSun', 'Songti SC', serif; color: ${inkColor}; box-sizing: border-box;">
+                    <div style="background: #fff; padding: 30px; border: 1px solid #ccc; width: 950px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); font-family: 'SimSun', 'Songti SC', serif; color: ${inkColor}; box-sizing: border-box;">
                         
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; position: relative;">
-                            <div style="width: 90px; height: 90px; border: 1px solid #ddd; padding: 2px;">
-                                <div style="width:100%; height:100%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:10px; color:#999;">
-                                    (二维码区域)
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px; padding: 0 10px;">
+                            <div style="width: 20%;">
+                                <div style="width: 80px; height: 80px; border: 1px solid #ddd; padding: 2px; background:#fff; display:flex; align-items:center; justify-content:center; color:#000; font-size:10px;">
+                                    (二维码)
                                 </div>
                             </div>
-
                             <div style="text-align: center; flex: 1; padding-top: 10px;">
-                                <h1 style="font-size: 32px; font-weight: bold; letter-spacing: 3px; margin: 0; font-family: 'KaiTi', 'STKaiti', serif; border-bottom: 2px double ${inkColor}; display: inline-block; padding-bottom: 5px;">电子发票（增值税专用发票）</h1>
-                                
-                                <div style="position: absolute; top: 5px; left: 50%; transform: translateX(-50%); width: 120px; height: 80px; border: 2px solid #e74c3c; border-radius: 50%; opacity: 0.5; color: #e74c3c; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; font-family: 'SimHei'; z-index: 2; pointer-events: none; letter-spacing: 1px;">
-                                    <div style="font-size: 10px; transform: scale(0.8);">全国统一发票监制章</div>
-                                    <div style="font-weight: bold; font-size: 14px; margin: 2px 0;">国家税务总局</div>
-                                    <div style="font-size: 10px; transform: scale(0.8);">上海市税务局</div>
-                                </div>
+                                <h4 style="font-size: 32px; font-family: 'KaiTi', 'STKaiti', serif; font-weight: bold; margin: 0; letter-spacing: 3px; color: ${inkColor}; border-bottom: 2px double ${inkColor}; display: inline-block; padding-bottom: 5px;">电子发票（增值税专用发票）</h2>
                             </div>
-
-                            <div style="text-align: right; line-height: 1.6; font-size: 14px; font-weight: bold; color: ${inkColor}; min-width: 200px;">
+                            <div style="width: 25%; text-align: right; line-height: 1.6; font-size: 14px; font-weight: bold; color: ${inkColor};">
                                 <div>发票代码：<span style="color:#000;">031001900111</span></div>
                                 <div>发票号码：<span style="color:#000;">${inv.no}</span></div>
                                 <div>开票日期：<span style="color:#000;">${inv.date}</span></div>
@@ -2832,106 +2824,102 @@ else if (moduleCode === 'ReconDetail') {
                         <table style="width: 100%; border-collapse: collapse; border: 2px solid ${inkColor}; font-size: 13px;">
                             
                             <tr>
-                                <td style="width: 60%; padding: 0; border-right: 1px solid ${inkColor}; border-bottom: 1px solid ${inkColor}; vertical-align: top;">
-                                    <div style="display: flex; height: 100%;">
-                                        <div style="width: 25px; padding: 15px 5px; text-align: center; border-right: 1px solid ${inkColor}; color: ${inkColor}; line-height: 1.5;">
-                                            购<br>买<br>方
-                                        </div>
-                                        <div style="padding: 8px 10px; flex: 1; line-height: 1.8;">
-                                            <div>名　　　　称：<span style="color: #000;">${inv.clientName}</span></div>
-                                            <div>纳税人识别号：<span style="color: #000; font-family: Arial;">${inv.clientTaxId}</span></div>
-                                            <div>地址、　电话：<span style="color: #000;">上海市浦东新区... 021-88888888</span></div>
-                                            <div>开户行及账号：<span style="color: #000;">招商银行... 6225xxxxxxxx</span></div>
-                                        </div>
-                                    </div>
+                                <td style="width: 25px; padding: 15px 5px; text-align: center; border-right: ${borderStyle}; border-bottom: ${borderStyle}; line-height: 1.4;">
+                                    购<br>买<br>方
                                 </td>
-                                <td style="width: 40%; padding: 0; border-bottom: 1px solid ${inkColor}; vertical-align: top;">
-                                    <div style="display: flex; height: 100%;">
-                                        <div style="width: 25px; padding: 15px 5px; text-align: center; border-right: 1px solid ${inkColor}; color: ${inkColor}; line-height: 1.5;">
-                                            密<br>码<br>区
-                                        </div>
-                                        <div style="padding: 8px; flex: 1; color: #000; font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 1px; word-break: break-all;">
-                                            (此区域为税务加密信息留白)
-                                            <br>/02&lt;&lt;53+*&gt;-6+77/&gt;+&lt;51*&lt;-
-                                            <br>/5+56*9&gt;81/02-8&lt;3*&lt;-31&lt;
-                                            <br>4&gt;2*9&lt;&lt;01+/8&lt;7+&gt;-2*5&lt;1
-                                        </div>
-                                    </div>
+                                <td style="width: 55%; padding: 6px 10px; border-right: ${borderStyle}; border-bottom: ${borderStyle}; line-height: 1.8; color: #333;">
+                                    <div><span style="color:${inkColor}">名　　　　称：</span>${inv.clientName}</div>
+                                    <div><span style="color:${inkColor}">纳税人识别号：</span><span style="font-family:Arial;">${inv.clientTaxId}</span></div>
+                                    <div><span style="color:${inkColor}">地 址、电 话：</span>上海市浦东新区... 021-88888888</div>
+                                    <div><span style="color:${inkColor}">开户行及账号：</span>招商银行... 6225xxxxxxxx</div>
+                                </td>
+                                <td style="width: 25px; padding: 15px 5px; text-align: center; border-right: ${borderStyle}; border-bottom: ${borderStyle}; line-height: 1.4;">
+                                    密<br>码<br>区
+                                </td>
+                                <td style="padding: 6px; border-bottom: ${borderStyle}; font-family: 'Courier New', monospace; font-size: 12px; color: #333; word-break: break-all;">
+                                    &lt;01*&gt;56*9&gt;81/02-8&lt;3*&lt;-31&lt;/02&lt;&lt;53+
+                                    <br>*&gt;-6+77/&gt;+&lt;51*&lt;-/5+56*9&gt;81/02-8
+                                    <br>&lt;3*&lt;-31&lt;4&gt;2*9&lt;&lt;01+/8&lt;7+&gt;-2*5&lt;1
                                 </td>
                             </tr>
 
-                            <tr style="text-align: center; height: 30px; color: ${inkColor};">
-                                <td colspan="2" style="padding: 0;">
+                            <tr style="text-align: center; color: ${inkColor}; background-color: transparent;">
+                                <td colspan="4" style="padding: 0; border-bottom: ${borderStyle};">
                                     <table style="width: 100%; border-collapse: collapse; text-align: center;">
                                         <tr>
-                                            <td style="width: 30%; border-right: 1px solid ${inkColor}; border-bottom: 1px solid ${inkColor};">货物或应税劳务、服务名称</td>
-                                            <td style="width: 10%; border-right: 1px solid ${inkColor}; border-bottom: 1px solid ${inkColor};">规格型号</td>
-                                            <td style="width: 5%; border-right: 1px solid ${inkColor}; border-bottom: 1px solid ${inkColor};">单位</td>
-                                            <td style="width: 10%; border-right: 1px solid ${inkColor}; border-bottom: 1px solid ${inkColor};">数量</td>
-                                            <td style="width: 15%; border-right: 1px solid ${inkColor}; border-bottom: 1px solid ${inkColor};">单价</td>
-                                            <td style="width: 15%; border-right: 1px solid ${inkColor}; border-bottom: 1px solid ${inkColor};">金额</td>
-                                            <td style="width: 5%; border-right: 1px solid ${inkColor}; border-bottom: 1px solid ${inkColor};">税率</td>
-                                            <td style="width: 10%; border-bottom: 1px solid ${inkColor};">税额</td>
-                                        </tr>
-                                        
-                                        <tr style="height: 120px; vertical-align: top; color: #000; font-family: Arial;">
-                                            <td style="border-right: 1px solid ${inkColor}; text-align: left; padding: 8px;">*物流辅助服务*运输服务费</td>
-                                            <td style="border-right: 1px solid ${inkColor};"></td>
-                                            <td style="border-right: 1px solid ${inkColor};">项</td>
-                                            <td style="border-right: 1px solid ${inkColor}; text-align: right; padding-right: 5px;">1</td>
-                                            <td style="border-right: 1px solid ${inkColor}; text-align: right; padding-right: 5px;">${inv.amount}</td>
-                                            <td style="border-right: 1px solid ${inkColor}; text-align: right; padding-right: 5px;">${inv.amount}</td>
-                                            <td style="border-right: 1px solid ${inkColor}; text-align: center;">${inv.taxRate}</td>
-                                            <td style="text-align: right; padding-right: 5px;">${inv.tax}</td>
-                                        </tr>
-
-                                        <tr style="height: 30px; border-top: 1px solid ${inkColor}; color: ${inkColor};">
-                                            <td colspan="5" style="border-right: 1px solid ${inkColor}; text-align: center;">合　　　　计</td>
-                                            <td style="border-right: 1px solid ${inkColor}; text-align: right; padding-right: 5px; color: #000; font-family: Arial;">¥${inv.amount}</td>
-                                            <td style="border-right: 1px solid ${inkColor};"></td>
-                                            <td style="text-align: right; padding-right: 5px; color: #000; font-family: Arial;">¥${inv.tax}</td>
-                                        </tr>
-                                        
-                                        <tr style="height: 35px; border-top: 1px solid ${inkColor}; color: ${inkColor};">
-                                            <td colspan="2" style="border-right: 1px solid ${inkColor}; text-align: center;">价税合计 (大写)</td>
-                                            <td colspan="6" style="text-align: left; padding-left: 15px; color: #000;">
-                                                <span style="font-size: 14px; margin-right: 10px;">ⓧ</span>
-                                                <span style="font-family: 'KaiTi'; font-size: 16px;">${inv.totalCn}</span>
-                                                <span style="float: right; margin-right: 20px; font-family: Arial;">(小写) ¥${inv.total}</span>
-                                            </td>
+                                            <td style="width: 30%; padding: 5px; border-right: ${borderStyle};">货物或应税劳务、服务名称</td>
+                                            <td style="width: 10%; padding: 5px; border-right: ${borderStyle};">规格型号</td>
+                                            <td style="width: 5%;  padding: 5px; border-right: ${borderStyle};">单位</td>
+                                            <td style="width: 10%; padding: 5px; border-right: ${borderStyle};">数量</td>
+                                            <td style="width: 15%; padding: 5px; border-right: ${borderStyle};">单价</td>
+                                            <td style="width: 15%; padding: 5px; border-right: ${borderStyle};">金额</td>
+                                            <td style="width: 5%;  padding: 5px; border-right: ${borderStyle};">税率</td>
+                                            <td style="width: 10%; padding: 5px;">税额</td>
                                         </tr>
                                     </table>
                                 </td>
                             </tr>
 
-                            <tr>
-                                <td style="width: 60%; padding: 0; border-right: 1px solid ${inkColor}; vertical-align: top;">
-                                    <div style="display: flex; height: 100%;">
-                                        <div style="width: 25px; padding: 15px 5px; text-align: center; border-right: 1px solid ${inkColor}; color: ${inkColor}; line-height: 1.5;">
-                                            销<br>售<br>方
-                                        </div>
-                                        <div style="padding: 8px 10px; flex: 1; line-height: 1.8;">
-                                            <div>名　　　　称：<span style="color: #000;">${inv.sellerName}</span></div>
-                                            <div>纳税人识别号：<span style="color: #000; font-family: Arial;">${inv.sellerTaxId}</span></div>
-                                            <div>地址、　电话：<span style="color: #000;">滁州市... 0550-8888888</span></div>
-                                            <div>开户行及账号：<span style="color: #000;">工行... 1234567890</span></div>
-                                        </div>
-                                    </div>
+                            <tr style="height: 150px; vertical-align: top; color: #000;">
+                                <td colspan="4" style="padding: 0; border-bottom: ${borderStyle};">
+                                    <table style="width: 100%; border-collapse: collapse; text-align: center; font-family: Arial;">
+                                        <tr>
+                                            <td style="width: 30%; padding: 8px; text-align: left; border-right: ${borderStyle};">*物流辅助服务*运输服务费</td>
+                                            <td style="width: 10%; border-right: ${borderStyle};"></td>
+                                            <td style="width: 5%;  border-right: ${borderStyle};">项</td>
+                                            <td style="width: 10%; text-align: right; padding-right: 5px; border-right: ${borderStyle};">1</td>
+                                            <td style="width: 15%; text-align: right; padding-right: 5px; border-right: ${borderStyle};">${inv.amount}</td>
+                                            <td style="width: 15%; text-align: right; padding-right: 5px; border-right: ${borderStyle};">${inv.amount}</td>
+                                            <td style="width: 5%;  text-align: right; padding-right: 5px; border-right: ${borderStyle};">${inv.taxRate}</td>
+                                            <td style="width: 10%; text-align: right; padding-right: 5px;">${inv.tax}</td>
+                                        </tr>
+                                        <tr><td style="border-right: ${borderStyle}; height: 100px;"></td><td style="border-right: ${borderStyle};"></td><td style="border-right: ${borderStyle};"></td><td style="border-right: ${borderStyle};"></td><td style="border-right: ${borderStyle};"></td><td style="border-right: ${borderStyle};"></td><td style="border-right: ${borderStyle};"></td><td></td></tr>
+                                    </table>
                                 </td>
-                                <td style="width: 40%; padding: 0; vertical-align: top;">
-                                    <div style="display: flex; height: 100%;">
-                                        <div style="width: 25px; padding: 15px 5px; text-align: center; border-right: 1px solid ${inkColor}; color: ${inkColor}; line-height: 1.5;">
-                                            备<br><br>注
+                            </tr>
+
+                            <tr style="height: 30px; color: ${inkColor}; border-bottom: ${borderStyle};">
+                                <td colspan="4" style="padding: 0;">
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="width: 30%; text-align: center; border-right: ${borderStyle}; padding: 5px;">合　　　　计</td>
+                                            <td style="width: 40%; border-right: ${borderStyle};"></td>
+                                            <td style="width: 15%; border-right: ${borderStyle}; text-align: right; padding-right: 5px; color: #000; font-family: Arial;">¥${inv.amount}</td>
+                                            <td style="width: 15%; text-align: right; padding-right: 5px; color: #000; font-family: Arial;">¥${inv.tax}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+
+                            <tr style="height: 35px; border-bottom: ${borderStyle};">
+                                <td colspan="4" style="padding: 0;">
+                                    <div style="display:flex; align-items:center; height: 100%;">
+                                        <div style="width: 23%; text-align: center; border-right: ${borderStyle}; height: 100%; padding-top: 8px; box-sizing:border-box;">价税合计 (大写)</div>
+                                        <div style="flex: 1; padding-left: 15px; display:flex; align-items:center; height: 100%;">
+                                            <span style="border: 1px solid ${inkColor}; border-radius: 50%; padding: 0 3px; font-size: 10px; margin-right: 8px; color:${inkColor};">ⓧ</span>
+                                            <span style="font-family: 'KaiTi'; font-size: 16px; color: #000;">${inv.totalCn}</span>
                                         </div>
-                                        <div style="padding: 8px; flex: 1; color: #000; font-size: 12px;">
-                                            (此处显示备注信息，如订单号、运单号等)
+                                        <div style="width: 30%; text-align: right; padding-right: 10px; color: ${inkColor};">
+                                            (小写) <span style="color: #000; font-family: Arial;">¥${inv.total}</span>
                                         </div>
                                     </div>
                                 </td>
                             </tr>
+
+                            <tr>
+                                <td style="width: 25px; padding: 15px 5px; text-align: center; border-right: ${borderStyle}; line-height: 1.4;">
+                                    销<br>售<br>方
+                                </td>
+                                <td colspan="3" style="padding: 6px 10px; line-height: 1.8; color: #333;">
+                                    <div><span style="color:${inkColor}">名　　　　称：</span>${inv.sellerName}</div>
+                                    <div><span style="color:${inkColor}">纳税人识别号：</span><span style="font-family:Arial;">${inv.sellerTaxId}</span></div>
+                                    <div><span style="color:${inkColor}">地 址、电 话：</span>滁州市... 0550-8888888</div>
+                                    <div><span style="color:${inkColor}">开户行及账号：</span>工行... 1234567890</div>
+                                </td>
+                            </tr>
                         </table>
 
-                        <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 14px;">
+                        <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 14px; padding: 0 10px;">
                             <div style="width: 25%;">收款人：李财务</div>
                             <div style="width: 25%;">复核：张主管</div>
                             <div style="width: 25%;">开票人：管理员</div>
@@ -2942,6 +2930,7 @@ else if (moduleCode === 'ReconDetail') {
                 `;
             }
 
+            
             // =========================================================================
             // 22. 税率配置 (Tax Rate Config)
             // =========================================================================
@@ -4768,8 +4757,8 @@ else if (moduleCode === 'ReconDetail') {
                 let mappings = JSON.parse(sessionStorage.getItem('EngineMappings'));
                 if (!mappings) {
                     mappings = [
-                        { id: 'MAP_CST_REV_AIR', name: '空运出口收入确认', type: '客户结算单', condition: "业务线=空运且状态=已确认", template: 'TPL_REV_AIR', status: '启用' },
-                        { id: 'MAP_AP_PAYMENT', name: '供应商运费应付', type: '供应商对账单', condition: "状态=已审批", template: 'TPL_COST_TRUNK', status: '启用' }
+                        { id: 'MAP_CST_REV_AIR', name: '空运出口收入确认', type: '客户结算单', condition: "业务线=空运且状态=已确认", template: 'TPL_REV_AIR', status: '禁用' },
+                        { id: 'MAP_AP_PAYMENT', name: '供应商运费应付', type: '供应商对账单', condition: "状态=已审批", template: 'TPL_COST_TRUNK', status: '禁用' }
                     ];
                     sessionStorage.setItem('EngineMappings', JSON.stringify(mappings));
                 }
@@ -4964,42 +4953,44 @@ else if (moduleCode === 'ReconDetail') {
                 `;
             }
             
- // =========================================================================
-            // 43. 结转损益 (PeriodEndProfit) - [修复版：确保模块存在且能点击]
+// =========================================================================
+            // 43. 结转损益 (PeriodEndProfit) - [逻辑修复版：默认未结转 + 真实计算]
             // =========================================================================
             else if (moduleCode === 'PeriodEndProfit') {
                 
-                // 1. 读取状态和金额
+                // 1. 读取状态 (默认为 false/未结转)
                 const isTransferred = sessionStorage.getItem('2025-11-ProfitTransferred') === 'true';
-                const savedAmount = sessionStorage.getItem('2025-11-ProfitAmount') || '+0.00';
                 
-                // 2. 设置显示变量
+                // 2. 读取已保存的结转金额 (如果没有，说明还没算过)
+                const savedAmount = sessionStorage.getItem('2025-11-ProfitAmount');
+                
+                // 3. 设置显示变量
                 const statusText = isTransferred ? '已结转' : '未结转';
                 const statusColor = isTransferred ? '#27ae60' : '#c0392b';
+                
+                // 关键：如果已结转，显示金额；否则显示“待执行”
                 const amountText = isTransferred 
                     ? `<span style="color: #2980b9; font-weight:bold;">${savedAmount}</span>` 
-                    : '<span style="color: #f39c12;">待执行</span>';
-                const timeText = isTransferred ? new Date().toLocaleString() : '2025-12-01 09:00';
+                    : '<span style="color: #f39c12;">待执行 (系统自动计算)</span>';
+                
+                const timeText = isTransferred ? new Date().toLocaleString() : '-';
                 const voucherText = isTransferred ? '结202511001' : '-';
                 
-                // 3. 定义操作按钮 (注意 onclick 中的单引号转义)
+                // 4. 操作按钮逻辑
                 const actionHtml = isTransferred 
-                    ? `<a href="javascript:void(0)" onclick="reverseTransfer('2025年11期', '结202511001', this)" style="color:#e74c3c;">冲回</a> | <a href="javascript:void(0)" onclick="viewPLVoucher('结202511001')" style="color:#3498db;">查看凭证</a>`
-                    : `<a href="javascript:void(0)" onclick="executeTransfer('2025年11期', this)" style="color:#27ae60; font-weight:bold;">执行</a>`;
+                    ? `<a href="javascript:void(0)" onclick="reverseTransfer('2025年11期')" style="color:#e74c3c;">冲回</a> | <a href="javascript:void(0)" onclick="viewPLVoucher('结202511001')" style="color:#3498db;">查看凭证</a>`
+                    : `<button onclick="executeTransfer('2025年11期')" class="btn-primary" style="padding:4px 8px; font-size:12px;">执行结转</button>`;
 
                 contentHTML += `
                     <h2>结转损益 (P&L Transfer) 🔄</h2>
                     <p style="color: #7f8c8d;">执行期末自动操作，将所有损益类科目余额结转到本年利润。</p>
                     
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                         <div style="margin-top:10px;">
-                            <button class="btn-primary" style="background-color: #27ae60;" onclick="executeTransfer('2025年11期', null)">执行损益结转</button>
-                            <button class="btn-primary" style="background-color: #e74c3c;" onclick="reverseTransfer('2025年11期', '结202510001', null)">冲回上期结转</button>
-                         </div>
+                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                         <button class="btn-primary" onclick="loadContent('PeriodEndProfit')">刷新状态</button>
                     </div>
 
                     <h3>结转历史记录</h3>
-                    <table class="data-table" id="plTable">
+                    <table class="data-table">
                         <thead>
                             <tr>
                                 <th>期间</th>
@@ -5011,7 +5002,7 @@ else if (moduleCode === 'ReconDetail') {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr id="row-2025-11">
+                            <tr id="row-2025-11" style="${isTransferred ? 'background:#f0fdf4' : ''}">
                                 <td>2025年11期</td>
                                 <td class="time-cell">${timeText}</td>
                                 <td class="amount-cell">${amountText}</td>
@@ -5019,92 +5010,72 @@ else if (moduleCode === 'ReconDetail') {
                                 <td class="status-cell"><span style="color: ${statusColor}; font-weight: bold;">${statusText}</span></td>
                                 <td class="action-cell">${actionHtml}</td>
                             </tr>
-                            <tr id="row-2025-10">
+                            <tr>
                                 <td>2025年10期</td>
-                                <td class="time-cell">2025-11-01 10:15</td>
-                                <td class="amount-cell">+50,000.00</td>
-                                <td class="voucher-cell">结202510001</td>
-                                <td class="status-cell"><span style="color: #27ae60; font-weight: bold;">已结转</span></td>
-                                <td class="action-cell">
-                                    <a href="javascript:void(0)" onclick="reverseTransfer('2025年10期', '结202510001', this)" style="color:#e74c3c;">冲回</a> | 
-                                    <a href="javascript:void(0)" onclick="viewPLVoucher('结202510001')" style="color:#3498db;">查看凭证</a>
-                                </td>
+                                <td>2025-11-01 10:15</td>
+                                <td>+50,000.00</td>
+                                <td>结202510001</td>
+                                <td><span style="color: #27ae60; font-weight: bold;">已结转</span></td>
+                                <td><span style="color:#ccc">历史数据</span></td>
                             </tr>
                         </tbody>
                     </table>
                 `;
             }
 
-          // =========================================================================
-            // 44. 月末结账/锁定 (PeriodEndClose) - 功能增强版
+
+// =========================================================================
+            // 44. 月末结账 (PeriodEndClose) - [修复版：反结账逻辑闭环]
             // =========================================================================
             else if (moduleCode === 'PeriodEndClose') {
-                contentHTML += `
-                    <h2>月末结账/锁定 (Period End) 🔒</h2>
-                    <p style="color: #7f8c8d;">执行正式的月末结账操作，关闭当前会计期间，防止新的交易或凭证录入，确保数据不可篡改。</p>
-                    
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
-                            <span style="font-weight:bold; color:#555;">当前会计期间：<span id="currentPeriodDisplay" style="color:#2980b9;">2025年11期</span></span>
-                            <div style="width: 1px; height: 20px; background: #ddd; margin: 0 10px;"></div>
-                            <select id="closeYearSelect" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="2025">2025年</option>
-                                <option value="2024">2024年</option>
-                            </select>
-                            <button class="btn-primary" onclick="refreshClosingCheck()">查询 / 刷新检查</button>
-                        </div>
-                    </div>
-                    
-                    <div class="action-bar" style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ccc;">
-                        <button id="btnExecuteClose" class="btn-primary" style="background-color: #95a5a6; cursor: not-allowed;" onclick="executeMonthEndClose()" disabled>执行月末结账 (2025年11期)</button>
-                        <button id="btnReOpen" class="btn-primary" style="background-color: #2980b9;" onclick="executeReOpen()">反结账</button>
-                        <span style="color: #e74c3c; margin-left: 20px; font-weight: bold; font-size: 13px;"><i class="icon">⚠️</i> 警告：反结账操作需谨慎，将记录审计日志。</span>
-                    </div>
-
-                    <h3>结账状态检查 (2025年11期)</h3>
-                    <p style="color: #7f8c8d;">只有所有关键检查项通过后，"执行月末结账" 按钮才会亮起。</p>
-                    <table class="data-table" id="checkListTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 40%;">检查项</th>
-                                <th style="width: 15%;">状态</th>
-                                <th>提示信息</th>
-                                <th style="width: 15%;">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="checkListBody">
-                            <tr><td colspan="4" style="text-align:center; color:#999;">点击“查询”开始系统体检...</td></tr>
-                        </tbody>
-                    </table>
-
-                    <h3 style="margin-top: 20px;">历史结账记录</h3>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>会计期间</th>
-                                <th>结账时间</th>
-                                <th>操作员</th>
-                                <th>状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>2025年10期</td>
-                                <td>2025-11-01 11:00</td>
-                                <td>管理员</td>
-                                <td><span style="color: #27ae60; font-weight: bold;">已结账</span></td>
-                                <td><span style="color:#ccc;">不可反结账(非最近)</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
                 
-                // 页面加载后自动触发一次检查（为了演示效果）
-                setTimeout(refreshClosingCheck, 100);
-            }
-            
+                // 1. 读取结账状态
+                const isClosed = sessionStorage.getItem('2025-11-MonthClosed') === 'true';
 
+                if (isClosed) {
+                    // --- 场景 A：已结账状态 (显示反结账) ---
+                    contentHTML += `
+                        <h2>月末结账/锁定 (Period End) 🔒</h2>
+                        
+                        <div style="background: #e8f5e9; padding: 40px; text-align: center; border: 1px solid #27ae60; border-radius: 8px; margin-top: 20px;">
+                            <h1 style="color: #27ae60; margin: 0;">✅ 2025年11期 已结账</h1>
+                            <p style="color: #666; margin-top: 10px;">当前会计期间已切换至 <strong>2025年12期</strong>。</p>
+                            <p style="color: #666;">历史数据已锁定，禁止录入、修改或删除凭证。</p>
+                            
+                            <div style="margin-top: 30px;">
+                                <button class="btn-primary" style="background-color: #e74c3c; padding: 10px 30px; font-size: 16px;" onclick="executeReOpen()">⏪ 申请反结账 (回退)</button>
+                            </div>
+                            <p style="font-size:12px; color:#999; margin-top:10px;">* 反结账操作将记录高危审计日志</p>
+                        </div>
+                    `;
+                } else {
+                    // --- 场景 B：未结账状态 (显示检查表) ---
+                    contentHTML += `
+                        <h2>月末结账/锁定 (Period End) 🔒</h2>
+                        <p style="color: #7f8c8d;">执行期末结账，锁定当期数据。结账前需通过所有系统检查。</p>
+                        
+                        <div class="filter-area" style="background-color: white; padding: 15px; margin-bottom: 20px;">
+                            <span style="font-weight:bold;">当前会计期间：<span style="color:#2980b9; font-size:18px;">2025年11期</span></span>
+                            <button class="btn-primary" onclick="refreshClosingCheck()" style="margin-left:15px;">🔄 刷新检查状态</button>
+                        </div>
+                        
+                        <div class="action-bar" style="margin-bottom: 15px;">
+                            <button id="btnExecuteClose" class="btn-primary" style="background-color: #95a5a6; cursor: not-allowed;" onclick="executeMonthEndClose()" disabled>执行月末结账</button>
+                        </div>
+
+                        <h3>结账前检查清单</h3>
+                        <table class="data-table">
+                            <thead><tr><th>检查项</th><th>状态</th><th>提示信息</th><th>操作</th></tr></thead>
+                            <tbody id="checkListBody">
+                                <tr><td colspan="4" style="text-align:center; color:#999;">请点击“刷新检查状态”开始自检...</td></tr>
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    // 自动触发一次检查
+                    setTimeout(refreshClosingCheck, 200);
+                }
+            }
 
             // =========================================================================
             // 45. 资产负债表 (ReportBalanceSheet) - 20 条明细数据
@@ -5713,7 +5684,7 @@ else if (moduleCode === 'ReconDetail') {
                 
                 // 1. 定义默认数据 (写死在代码里的老数据)
                 const defaultCustomers = [
-                    { id: 'CUST-1024', name: '阳光制造有限公司', taxId: '91320100MA1...', type: '月结', limit: '100,000.00', days: '30', status: '正常' },
+                  /*   { id: 'CUST-1024', name: '阳光制造有限公司', taxId: '91320100MA1...', type: '月结', limit: '1200.00', days: '30', status: '正常' }, */
                     { id: 'CUST-8812', name: '张三 (个人)', taxId: '-', type: '现结', limit: '0.00', days: '0', status: '正常' },
                     { id: 'CUST-9001', name: '风险贸易商贸', taxId: '91310000MA3...', type: '月结', limit: '50,000.00', days: '60', status: '已冻结' }
                 ];
@@ -6137,87 +6108,63 @@ function handleRedDashUndo(element, redVoucherId, originalVoucherId) {
 
 
 
-// =========================================================================
-    // 1. 执行结转损益 (修复版：确保能写入日志)
-    // =========================================================================
-window.executeTransfer = function(period, btnElement) {
-        if (!confirm(`❓ 确认要执行【${period}】的期末损益结转吗？`)) return;
+// ==========================================================
+    // 期末处理与结转逻辑 (终极修复版：增加结账锁定校验)
+    // ==========================================================
 
-        // 1. ★★★ 真实计算利润 ★★★
-        const result = calculateRealProfit();
-        const realProfit = result.profit.toFixed(2);
-        const profitStr = (result.profit >= 0 ? '+' : '') + parseFloat(realProfit).toLocaleString();
-
-        // 2. 保存状态 (同时保存算出来的金额，以便刷新页面后还能看到)
-        if (period === '2025年11期') {
-            sessionStorage.setItem('2025-11-ProfitTransferred', 'true');
-            sessionStorage.setItem('2025-11-ProfitAmount', profitStr); // 存金额
-            sessionStorage.setItem('2025-11-ProfitDetail', JSON.stringify(result)); // 存明细供凭证使用
+    /** 1. 执行结转 (带结账锁定校验) */
+    window.executeTransfer = function(period) {
+        // ★★★ 核心校验：检查是否已结账 ★★★
+        if (sessionStorage.getItem('2025-11-MonthClosed') === 'true') {
+            alert("⛔ 操作被拦截！\n\n当前会计期间【已结账锁定】。\n如需重新结转损益，请先前往【月末结账】模块执行反结账。");
+            return;
         }
 
-        // 3. 记日志
-        if (typeof addAuditLog === 'function') {
-            addAuditLog({
-                 level: '中风险',
-                 time: new Date().toLocaleString(),
-                 user: '当前用户',
-                 module: '结转损益',
-                 action: '执行结转',
-                 detail: `期间：${period}，结转净利：${profitStr}`
-            });
+        // ... (下面的逻辑保持不变) ...
+        
+        // 1. 先计算
+        const res = calculateRealProfit();
+
+        if (res.count === 0) {
+            alert("⚠️ 系统未检测到【已审核】或【已记账】的凭证。\n请先去审核凭证。");
+            return;
         }
 
-        // 4. 界面更新
-        let row = null;
-        if (btnElement) {
-            row = btnElement.closest('tr');
-        } else {
-            row = document.getElementById('row-2025-11');
-        }
+        const profitStr = (res.profit >= 0 ? '+' : '') + res.profit.toLocaleString('en-US', {minimumFractionDigits: 2});
+        
+        if (!confirm(`❓ 确认执行【${period}】损益结转吗？\n\n本期净利润：${profitStr}`)) return;
 
-        if (row) {
-             const nowTime = new Date().toLocaleString();
-             const color = result.profit >= 0 ? '#2980b9' : '#e74c3c'; // 赚钱蓝，亏钱红
+        sessionStorage.setItem('2025-11-ProfitTransferred', 'true');
+        sessionStorage.setItem('2025-11-ProfitAmount', profitStr);
+        sessionStorage.setItem('2025-11-ProfitDetail', JSON.stringify(res)); 
 
-             row.querySelector('.time-cell').innerText = nowTime;
-             row.querySelector('.amount-cell').innerHTML = `<span style="color: ${color}; font-weight:bold;">${profitStr}</span>`;
-             row.querySelector('.voucher-cell').innerText = "结202511001";
-             row.querySelector('.status-cell').innerHTML = `<span style="color: #27ae60; font-weight: bold;">已结转</span>`;
-             
-             row.querySelector('.action-cell').innerHTML = `
-                <a href="javascript:void(0)" onclick="reverseTransfer('${period}', '结202511001', this)" style="color:#e74c3c;">冲回</a> | 
-                <a href="javascript:void(0)" onclick="viewPLVoucher('结202511001')" style="color:#3498db;">查看凭证</a>
-            `;
-        }
+        // 记日志
+        addAuditLog({level:'中风险', time:new Date().toLocaleString(), user:'当前用户', module:'结转损益', action:'执行结转', detail:profitStr});
 
-        setTimeout(() => {
-            alert(`✅ 【${period}】损益结转成功！\n\n本期净利润：${profitStr}`);
-        }, 100);
-    }
-    
-    
-window.reverseTransfer = function(period, voucherId, btnElement) {
-        if (!confirm(`⚠️ 警告：确定要冲回【${period}】吗？`)) return;
-
-        if (period === '2025年11期') {
-            sessionStorage.removeItem('2025-11-ProfitTransferred');
-        }
-
-        // ★★★ 修改点：调用 addAuditLog 追加日志 ★★★
-        addAuditLog({
-             level: '高危',
-             time: new Date().toLocaleString(),
-             user: '当前用户',
-             ip: '127.0.0.1',
-             module: '结转损益',
-             action: '冲回损益结转',
-             detail: `期间：${period}，作废凭证：${voucherId}`
-        });
-
-        alert(`✅ 【${period}】已成功冲回！\n已记录审计日志。`);
-        loadContent('PeriodEndProfit'); 
+        alert(`✅ 结转成功！\n损益类科目余额已清零。`);
+        loadContent('PeriodEndProfit');
     }
 
+    /** 2. 冲回结转 (带结账锁定校验) */
+    window.reverseTransfer = function(period) {
+        // ★★★ 核心校验：检查是否已结账 ★★★
+        if (sessionStorage.getItem('2025-11-MonthClosed') === 'true') {
+            alert("⛔ 操作被拦截！\n\n当前会计期间【已结账锁定】。\n如需冲回损益，请先前往【月末结账】模块执行反结账。");
+            return;
+        }
+
+        // ... (下面的逻辑保持不变) ...
+
+        if (!confirm(`⚠️ 警告：确定要冲回【${period}】吗？\n此操作将作废结转凭证。`)) return;
+
+        sessionStorage.removeItem('2025-11-ProfitTransferred');
+        
+        // 记日志
+        addAuditLog({level:'高危', time:new Date().toLocaleString(), user:'当前用户', module:'结转损益', action:'冲回结转', detail:period});
+        
+        alert("✅ 已成功冲回！\n您现在可以修改凭证或重新结转。");
+        loadContent('PeriodEndProfit');
+    }
 
   /**
      * 3. 查看结转凭证详情 (修正会计逻辑)
@@ -6362,31 +6309,48 @@ window.viewPLVoucher = function(voucherId) {
         }
     }
 
-  window.executeReOpen = function() {
+
+/**
+     * 3. [终极修复版] 反结账 (修复页面联动 + 确保记日志)
+     */
+    window.executeReOpen = function() {
+        // 1. 读取当前状态
         const isClosed = sessionStorage.getItem('2025-11-MonthClosed') === 'true';
+        
+        // 如果还没结账，就不用反了
         if (!isClosed) {
-            alert("⚠️ 当前期间尚未结账，无需反结账。");
+            alert("⚠️ 当前期间尚未结账，无需操作。");
             return;
         }
 
-        if (confirm(`⚠️ 【反结账警告】确认要反结账吗？`)) {
-             sessionStorage.removeItem('2025-11-MonthClosed');
-
-             // ★★★ 修改点：调用 addAuditLog 追加日志 ★★★
-             addAuditLog({
-                 level: '高危',
-                 time: new Date().toLocaleString(),
-                 user: '当前用户',
-                 ip: '127.0.0.1',
-                 module: '月末结账',
-                 action: '执行反结账',
-                 detail: '目标期间：2025年11期'
-             });
-
-             alert("✅ 反结账成功！已记录审计日志。");
-             refreshClosingCheck(); 
+        if (confirm("⚠️ 警告：确定要【反结账】吗？\n\n此操作将解锁 11 月数据，并记录高危审计日志。")) {
+            
+            // 2. 清除结账状态 (核心动作)
+            sessionStorage.removeItem('2025-11-MonthClosed');
+            
+            // 3. 写入审计日志 (确保 addAuditLog 函数存在)
+            if (typeof addAuditLog === 'function') {
+                addAuditLog({
+                    level: '高危',
+                    time: new Date().toLocaleString(),
+                    user: '当前用户',
+                    ip: '127.0.0.1',
+                    module: '月末结账',
+                    action: '执行反结账',
+                    detail: '回退至2025-11期，解除数据锁定'
+                });
+            } else {
+                console.error("addAuditLog 函数未定义，日志写入失败");
+            }
+            
+            alert("✅ 反结账成功！\n\n当前期间已回退至 [2025年11期]。");
+            
+            // 4. ★★★ 关键修复：重新加载模块，刷新页面视图 ★★★
+            // 之前是 refreshClosingCheck()，那只刷新表格，不刷新整体视图
+            loadContent('PeriodEndClose'); 
         }
     }
+
 
     /**
      * 2. 执行月末结账动作
@@ -7824,8 +7788,209 @@ window.viewReconDetail = function(reconId) {
     loadContent('ReconDetail');
 }
     
-    
+   
+/**
+     * 核心辅助：根据凭证计算本期损益 (实现数据联动)
+     */
+    function calculateRealProfit() {
+        const vouchers = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
+        
+        let totalIncome = 0;  // 收入 (贷方)
+        let totalCost = 0;    // 成本费用 (借方)
 
+        vouchers.forEach(v => {
+            // 只统计已生效的凭证
+            if (v.status === '已审核' || v.status === '已记账') {
+                if (v.lines) {
+                    v.lines.forEach(line => {
+                        const code = line.account.split(' ')[0]; // 取科目代码
+                        const debit = parseFloat(line.debit) || 0;
+                        const credit = parseFloat(line.credit) || 0;
+
+                        // 简单的损益识别逻辑：
+                        // 60开头 = 收入 (取贷方)
+                        if (code.startsWith('60') || code.startsWith('61') || code.startsWith('63')) {
+                            totalIncome += credit;
+                        }
+                        // 64, 66, 67, 68开头 = 成本/费用 (取借方)
+                        else if (code.startsWith('64') || code.startsWith('66') || code.startsWith('67') || code.startsWith('68')) {
+                            totalCost += debit;
+                        }
+                    });
+                }
+            }
+        });
+
+        return {
+            income: totalIncome,
+            cost: totalCost,
+            profit: totalIncome - totalCost
+        };
+    }
+
+
+// ==========================================================
+    // ★★★ 核心修复补丁：期末结转与结账逻辑 (请放在 Script 最底部) ★★★
+    // ==========================================================
+
+    // 1. [升级版] 智能计算利润 (支持中文科目 + 状态过滤)
+    window.calculateRealProfit = function() {
+        const vouchers = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
+        let totalIncome = 0; 
+        let totalCost = 0;
+        let validCount = 0;
+
+        console.log("开始计算利润...");
+
+        vouchers.forEach(v => {
+            // 只有“已审核”或“已记账”的凭证才参与计算
+            if (v.status === '已审核' || v.status === '已记账') {
+                validCount++;
+                if (v.lines) {
+                    v.lines.forEach(line => {
+                        // 兼容处理：提取科目代码和名称
+                        const acctStr = line.account ? line.account.trim() : '';
+                        const code = acctStr.split(' ')[0]; 
+                        const debit = parseFloat(line.debit) || 0;
+                        const credit = parseFloat(line.credit) || 0;
+
+                        // --- 智能匹配逻辑 ---
+                        
+                        // A. 收入类 (贷方)：代码以 60/61/63 开头，或名称含“收入”
+                        if (code.startsWith('60') || code.startsWith('61') || code.startsWith('63') || acctStr.includes('收入')) {
+                            totalIncome += credit;
+                        }
+                        
+                        // B. 成本费用类 (借方)：代码以 64/66/67/68 开头，或名称含“成本”、“费用”、“工资”、“运费”
+                        else if (code.startsWith('64') || code.startsWith('66') || code.startsWith('67') || code.startsWith('68') || 
+                                 acctStr.includes('成本') || acctStr.includes('费用') || acctStr.includes('工资') || acctStr.includes('运费')) {
+                            totalCost += debit;
+                        }
+                    });
+                }
+            }
+        });
+
+        console.log(`计算完成：有效凭证${validCount}张，收入${totalIncome}，成本${totalCost}`);
+        
+        return {
+            income: totalIncome,
+            cost: totalCost,
+            profit: totalIncome - totalCost,
+            count: validCount
+        };
+    }
+
+    // 2. [修复版] 执行损益结转
+    window.executeTransfer = function(period) {
+        // 1. 先计算
+        const res = calculateRealProfit();
+
+        if (res.count === 0) {
+            alert("⚠️ 系统未检测到【已审核】或【已记账】的凭证。\n\n请先去【凭证查询/审核】页面审核凭证，然后再来结转。");
+            return;
+        }
+
+        const profitStr = (res.profit >= 0 ? '+' : '') + res.profit.toLocaleString('en-US', {minimumFractionDigits: 2});
+        
+        if (!confirm(`❓ 确认执行【${period}】损益结转吗？\n\n📊 系统检测到：\n- 有效凭证：${res.count} 张\n- 总收入：${res.income}\n- 总成本费用：${res.cost}\n- 本期净利润：${profitStr}`)) return;
+
+        // 2. 存入 Session
+        sessionStorage.setItem('2025-11-ProfitTransferred', 'true');
+        sessionStorage.setItem('2025-11-ProfitAmount', profitStr);
+        sessionStorage.setItem('2025-11-ProfitDetail', JSON.stringify(res)); // 保存明细供查看
+
+        // 3. 刷新页面
+        alert(`✅ 结转成功！\n损益类科目余额已清零，差额转入本年利润。`);
+        loadContent('PeriodEndProfit');
+    }
+
+    // 3. [修复版] 月末结账检查 (修复按钮无法点击)
+    window.refreshClosingCheck = function() {
+        const tbody = document.getElementById('checkListBody');
+        if(!tbody) return; // 如果不在结账页面，退出
+
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#3498db;">⏳ 系统正在自检...</td></tr>';
+
+        setTimeout(() => {
+            // 读取状态
+            const isTransferred = sessionStorage.getItem('2025-11-ProfitTransferred') === 'true';
+            
+            // 构造检查项状态
+            const statusHtml = isTransferred 
+                ? '<span style="color:#27ae60; font-weight:bold;">✅ 通过</span>' 
+                : '<span style="color:#c0392b; font-weight:bold;">❌ 失败</span>';
+            
+            const msg = isTransferred 
+                ? '损益已结转。' 
+                : '损益类科目有余额，请先执行结转。';
+            
+            const action = isTransferred 
+                ? '-' 
+                : `<a href="javascript:void(0)" onclick="loadContent('PeriodEndProfit')" style="color:#3498db; font-weight:bold;">去处理</a>`;
+
+            // 渲染表格
+            tbody.innerHTML = `
+                <tr>
+                    <td>所有凭证已审核</td>
+                    <td><span style="color:#27ae60; font-weight:bold;">✅ 通过</span></td>
+                    <td>无待审核凭证。</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>损益类科目结转</td>
+                    <td>${statusHtml}</td>
+                    <td>${msg}</td>
+                    <td>${action}</td>
+                </tr>
+                <tr>
+                    <td>试算平衡检查</td>
+                    <td><span style="color:#27ae60; font-weight:bold;">✅ 通过</span></td>
+                    <td>借贷平衡。</td>
+                    <td>-</td>
+                </tr>
+            `;
+
+            // 控制主按钮 (关键修复)
+            const btnClose = document.getElementById('btnExecuteClose');
+            if (btnClose) {
+                if (isTransferred) {
+                    window.g_isClosingReady = true; // 设置全局变量
+                    btnClose.disabled = false;
+                    btnClose.style.backgroundColor = "#c0392b"; // 变红表示可点击
+                    btnClose.style.cursor = "pointer";
+                    btnClose.innerText = "执行月末结账 (2025年11期)";
+                } else {
+                    window.g_isClosingReady = false;
+                    btnClose.disabled = true;
+                    btnClose.style.backgroundColor = "#95a5a6";
+                    btnClose.innerText = "无法结账 (请先处理失败项)";
+                }
+            }
+        }, 500);
+    }
+
+    // 4. [修复版] 执行结账
+    window.executeMonthEndClose = function() {
+        if (!window.g_isClosingReady) {
+            alert("❌ 检查未通过，无法结账。");
+            return;
+        }
+        if (confirm("🔒 确认执行月末结账吗？\n\n结账后数据将被锁定，无法修改。")) {
+            sessionStorage.setItem('2025-11-MonthClosed', 'true');
+            alert("✅ 结账成功！会计期间已切换。");
+            loadContent('PeriodEndClose'); // 刷新页面
+        }
+    }
+
+/*     // 5. [修复版] 反结账
+    window.executeReOpen = function() {
+        if (confirm("⚠️ 确认反结账吗？\n数据将恢复可编辑状态。")) {
+            sessionStorage.removeItem('2025-11-MonthClosed');
+            alert("✅ 反结账成功！");
+            loadContent('PeriodEndClose'); // 刷新页面
+        }
+    } */
 </script>
 
 </body>
