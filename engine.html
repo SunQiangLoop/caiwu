@@ -1001,36 +1001,46 @@ else if (moduleCode === 'ReconCustomer') {
         sessionStorage.setItem('CustomerRecons', JSON.stringify(recons));
     }
 
-    const rows = recons.map(r => {
-        let statusColor = '#333';
-        let action = '';
+  const rows = recons.map(r => {
+    let statusColor = '#333';
+    let action = '';
 
-        if (r.status === '待客户确认') {
-            statusColor = '#f39c12';
-            action = `<a href="javascript:void(0)" onclick="confirmRecon('${r.id}')" style="color:#27ae60; font-weight:bold;">模拟客户确认</a>`;
-        } 
-        else if (r.status === '已确认') {
-            statusColor = '#27ae60';
-            action = `<button onclick="applyInvoiceFromRecon('${r.id}', '${r.client}', '${r.amount}')" class="btn-primary" style="padding:4px 8px; font-size:12px;">申请开票</button>`;
-        } 
-        else if (r.status === '开票中' || r.status === '已开票') {
-            statusColor = '#999';
-            action = `<span style="color:#ccc">已推送到税务</span>`;
-        }
+    if (r.status === '待客户确认') {
+        statusColor = '#f39c12'; // 黄色
+        // ★★★ 修改点：增加“驳回”按钮 ★★★
+        action = `
+            <a href="javascript:void(0)" onclick="confirmRecon('${r.id}')" style="color:#27ae60; font-weight:bold;">确认</a> | 
+            <a href="javascript:void(0)" onclick="rejectRecon('${r.id}')" style="color:#e74c3c;">驳回</a>
+        `;
+    } 
+    else if (r.status === '已驳回') {
+        statusColor = '#c0392b'; // 红色
+        // ★★★ 修改点：驳回后允许财务“重新提交” ★★★
+        action = `
+            <span style="color:#999; font-size:12px;">原因: ${r.rejectReason || '无'}</span><br>
+            <a href="javascript:void(0)" onclick="resubmitRecon('${r.id}')" style="color:#3498db;">修正并重提</a>
+        `;
+    }
+    else if (r.status === '已确认') {
+        statusColor = '#27ae60';
+        action = `<button onclick="applyInvoiceFromRecon('${r.id}', '${r.client}', '${r.amount}')" class="btn-primary" style="padding:4px 8px; font-size:12px;">申请开票</button>`;
+    } 
+    else if (r.status === '开票中' || r.status === '已开票') {
+        statusColor = '#999';
+        action = `<span style="color:#ccc">已推送到税务</span>`;
+    }
 
-        // ⭐ 新增：查看明细按钮
-        const detailBtn = `<a href="javascript:void(0)" onclick="viewReconDetail('${r.id}')" style="color:#3498db; margin-left:10px;">📋 查看明细</a>`;
+    const detailBtn = `<a href="javascript:void(0)" onclick="viewReconDetail('${r.id}')" style="color:#3498db; margin-left:5px;">明细</a>`;
 
-        return `<tr>
-            <td>${r.id}</td>
-            <td>${r.client}</td>
-            <td>${r.period}</td>
-            <td style="text-align:right; font-weight:bold;">${r.amount}</td>
-            <td><span style="color:${statusColor}; font-weight:bold;">${r.status}</span></td>
-            <td>${action} ${detailBtn}</td>
-        </tr>`;
-    }).join('');
-
+    return `<tr>
+        <td>${r.id}</td>
+        <td>${r.client}</td>
+        <td>${r.period}</td>
+        <td style="text-align:right; font-weight:bold;">${r.amount}</td>
+        <td><span style="color:${statusColor}; font-weight:bold;">${r.status}</span></td>
+        <td>${action} ${detailBtn}</td>
+    </tr>`;
+}).join('');
     contentHTML += `
         <h2>客户对账 (Customer Reconciliation)</h2>
         <p style="color: #7f8c8d;">标准流程：生成对账单 → 等待客户确认 → 确认后申请开票。</p>
@@ -4445,16 +4455,15 @@ else if (moduleCode === 'ReconDetail') {
                     let statusColor = '#27ae60';
                     let actionBtns = '';
 
+                    // 1. 状态颜色判断
                     if (v.status === '待审核') {
                         statusColor = '#f39c12';
-                        // ★★★ 会计核心功能：审核 + 驳回 ★★★
                         actionBtns = `
                             <a href="javascript:void(0)" onclick="auditPass('${v.id}')" style="color:#27ae60; font-weight:bold;">审核</a> | 
                             <a href="javascript:void(0)" onclick="auditReject('${v.id}')" style="color:#e74c3c;">驳回</a>
                         `;
                     } else if (v.status === '已审核' || v.status === '已记账') {
                         statusColor = '#27ae60';
-                        // 已审核的可以红冲
                         actionBtns = `
                             <a href="javascript:void(0)" onclick="openVoucherDetail(this)" style="color:#3498db;">查看</a> | 
                             <a href="javascript:void(0)" onclick="handleRedDash(this, '${v.id}')" style="color:#f39c12;">红冲</a>
@@ -4467,12 +4476,18 @@ else if (moduleCode === 'ReconDetail') {
                          actionBtns = `<span style="color:#ccc;">已作废</span>`;
                     }
 
+                    // 2. ★★★ 核心修复：动态获取摘要 ★★★
+                    // 如果有分录行，取第一行的摘要；否则显示默认值
+                    const displaySummary = (v.lines && v.lines.length > 0) ? v.lines[0].summary : '手动录入凭证';
+
                     return `
                         <tr id="row-${v.id}">
                             <td><input type="checkbox" ${v.status === '待审核' ? '' : 'disabled'}></td>
                             <td class="val-id">${v.id}</td>
                             <td class="val-date">${v.date}</td>
-                            <td class="val-summary">手动录入凭证</td>
+                            
+                            <td class="val-summary">${displaySummary}</td>
+                            
                             <td class="val-debit">${v.amount}</td>
                             <td class="val-credit">${v.amount}</td>
                             <td class="status-cell"><span style="color: ${statusColor}; font-weight: bold;">${v.status || '已记账'}</span></td>
@@ -4530,88 +4545,224 @@ else if (moduleCode === 'ReconDetail') {
                 `;
             }
 
-           // =========================================================================
-            // [修复版] 凭证详情页 - 支持动态分录行
+// =========================================================================
+            // 22. 凭证详情页 (VoucherDetail) - [最终修复版：自动计算合计金额]
             // =========================================================================
             else if (moduleCode === 'VoucherDetail') {
-                // 1. 获取数据
-                const v = g_currentVoucher || {
-                    id: '记2025110001', date: '2025-11-20', summary: '默认演示数据', 
-                    debit: '0.00', credit: '0.00', status: '已记账', isRed: false,
-                    // 默认分录行 (如果没有传 lines)
-                    lines: [
-                        { zy: '支付办公用品', km: '6602 管理费用', jf: '500.00', df: '' },
-                        { zy: '支付办公用品', km: '1002 银行存款', jf: '', df: '500.00' }
-                    ]
-                };
+                // 1. 尝试获取传递的基础信息
+                let v = g_currentVoucher || { id: '无数据' };
 
-                const colorStyle = v.isRed ? 'color: #e74c3c;' : 'color: #333;';
-                const borderStyle = v.isRed ? 'border: 2px solid #e74c3c;' : 'border: 2px solid #e74c3c;'; // 凭证红框
-                const titleText = v.isRed ? '记账凭证 (红字)' : '记账凭证';
+                // 自动回捞完整数据
+                if (v.id) {
+                    const allVouchers = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
+                    const fullData = allVouchers.find(item => item.id === v.id);
+                    if (fullData) v = fullData;
+                }
 
-                // 2. 动态生成分录行 HTML
+                // 数据兜底
+                if (!v.lines) v.lines = []; 
+
+                // ★★★ 核心修复：现场重新计算合计金额 (不再依赖 v.debit) ★★★
+                let calcDebit = 0;
+                let calcCredit = 0;
+
+                v.lines.forEach(line => {
+                    // 兼容不同字段名并去逗号
+                    const dStr = (line.jf || line.debit || '0').toString().replace(/,/g, '');
+                    const cStr = (line.df || line.credit || '0').toString().replace(/,/g, '');
+                    
+                    calcDebit += parseFloat(dStr) || 0;
+                    calcCredit += parseFloat(cStr) || 0;
+                });
+
+                // 格式化为字符串 (保留2位小数)
+                const totalDebitStr = calcDebit.toFixed(2);
+                const totalCreditStr = calcCredit.toFixed(2);
+                // ★★★ 修复结束 ★★★
+
+                // 解析日期
+                const dateVal = v.date || new Date().toISOString().slice(0,10);
+                const dateObj = new Date(dateVal);
+                const y = dateObj.getFullYear();
+                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const d = String(dateObj.getDate()).padStart(2, '0');
+
+                // 样式保持不变
+                const voucherStyle = `
+                    <style>
+                        .voucher-box {
+                            font-family: "SimSun", "Songti SC", serif;
+                            color: #333;
+                            width: 1000px;
+                            margin: 0 auto;
+                            padding: 30px;
+                            background: #fff;
+                            position: relative;
+                            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                            border: 1px solid #ddd;
+                        }
+                        .v-title-container { text-align: center; margin-bottom: 10px; position: relative; }
+                        .v-title {
+                            font-size: 36px; font-weight: bold; letter-spacing: 15px;
+                            display: inline-block; border-bottom: 3px double #333;
+                            padding-bottom: 5px; margin-bottom: 5px; text-shadow: 0.5px 0 0 #333;
+                        }
+                        .v-header-info {
+                            display: flex; justify-content: space-between; align-items: flex-end;
+                            margin-bottom: 5px; font-size: 15px; padding: 0 5px;
+                        }
+                        .v-date-group span {
+                            display: inline-block; border-bottom: 1px solid #333;
+                            width: 50px; text-align: center; margin: 0 2px; font-family: Arial;
+                        }
+                        .v-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
+                        .v-table th, .v-table td {
+                            border: 1px solid #333; height: 40px; vertical-align: middle; font-size: 15px;
+                        }
+                        .v-table th { text-align: center; font-weight: bold; padding: 5px; }
+                        
+                        /* 金额网格背景 */
+                        .money-grid-bg {
+                            background-image: linear-gradient(to right, transparent 95%, #ddd 95%);
+                            background-size: 9.09% 100%; 
+                            font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold;
+                            letter-spacing: 6px; text-align: right; padding-right: 3px; overflow: hidden;
+                        }
+                        .money-header-row div {
+                            display: flex; justify-content: space-between; padding: 0 2px;
+                            color: #666; font-weight: normal; transform: scale(0.95); font-size: 12px;
+                        }
+                        .money-header-row span { flex: 1; text-align: center; border-right: 1px solid #eee; }
+                        .money-header-row span:last-child { border: 0; }
+                        .v-footer {
+                            margin-top: 15px; display: flex; justify-content: space-between; font-size: 14px; padding: 0 10px;
+                        }
+                        .v-footer span {
+                            display: inline-block; width: 70px; border-bottom: 1px solid #333; height: 20px; text-align: center;
+                        }
+                        .attachment-side { position: absolute; right: -25px; top: 110px; width: 20px; font-size: 13px; line-height: 1.2; text-align: center; }
+                    </style>
+                `;
+
+                // 动态生成分录行
                 let linesHTML = '';
-                if (v.lines && v.lines.length > 0) {
-                    linesHTML = v.lines.map(line => `
-                        <tr style="height: 40px; ${colorStyle}">
-                            <td style="border: 1px solid #e74c3c; padding: 8px;">${line.zy}</td>
-                            <td style="border: 1px solid #e74c3c; padding: 8px;">${line.km}</td>
-                            <td style="border: 1px solid #e74c3c; padding: 8px; text-align: right; font-family: 'Courier New'; font-weight: bold; font-size: 16px;">${line.jf}</td>
-                            <td style="border: 1px solid #e74c3c; padding: 8px; text-align: right; font-family: 'Courier New'; font-weight: bold; font-size: 16px;">${line.df}</td>
+                const minRows = 5;
+                const loopCount = Math.max(v.lines.length, minRows);
+
+                for (let i = 0; i < loopCount; i++) {
+                    const line = v.lines[i] || {}; 
+                    
+                    const summary = line.summary || line.zy || '';
+                    const accountStr = line.account || line.km || '';
+                    let debit = line.debit || line.jf || '';
+                    let credit = line.credit || line.df || '';
+
+                    let subjectCode = '';
+                    let subjectName = accountStr;
+                    
+                    const match = accountStr.match(/^(\d+)\s+(.*)/); 
+                    if (match) {
+                        subjectCode = match[1]; 
+                        subjectName = match[2]; 
+                    } else if (/^\d+$/.test(accountStr)) {
+                        subjectCode = accountStr;
+                        subjectName = ''; 
+                    }
+
+                    const debitVal = debit ? debit.toString().replace(/,/g, '') : '';
+                    const creditVal = credit ? credit.toString().replace(/,/g, '') : '';
+                    const rowColor = v.isRed ? 'color: red;' : '';
+
+                    linesHTML += `
+                        <tr style="${rowColor}">
+                            <td style="padding:0 8px;">${summary}</td>
+                            <td style="padding:0 8px;">${subjectName}</td>
+                            <td style="padding:0 8px; text-align:center;">${subjectCode}</td>
+                            <td style="text-align:center;">${summary ? '√' : ''}</td>
+                            <td class="money-grid-bg">${debitVal}</td>
+                            <td class="money-grid-bg">${creditVal}</td>
                         </tr>
-                    `).join('');
+                    `;
                 }
 
                 contentHTML += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                        <button class="btn-primary" style="background-color: #95a5a6;" onclick="loadContent('PeriodEndProfit')"> < 返回列表</button>
+                    ${voucherStyle}
+                    
+                    <div style="margin-bottom:20px; display:flex; justify-content:space-between;">
+                        <button class="btn-primary" style="background-color: #95a5a6;" onclick="loadContent('VoucherQueryPrint')"> < 返回列表</button>
                         <div>
-                            <button class="btn-primary" style="background-color: #3498db;">🖨 打印凭证</button>
+                            <button class="btn-primary" style="background-color: #3498db;" onclick="window.print()">🖨 打印凭证</button>
                         </div>
                     </div>
 
-                    <div style="background: white; padding: 40px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 900px; margin: 0 auto; border: 1px solid #e8e8e8;">
-                        
-                        <div style="text-align: center; margin-bottom: 30px; position: relative;">
-                            <h1 style="color: #e74c3c; font-size: 32px; margin: 0; letter-spacing: 5px; text-decoration: underline; text-decoration-style: double;">${titleText}</h1>
-                            <div style="position: absolute; right: 0; top: 10px; color: #666;">附单据 1 张</div>
+                    <div class="voucher-box">
+                        <div class="v-title-container">
+                            <div class="v-title">记 账 凭 证</div>
+                            <div style="position:absolute; right:10px; top:10px; font-size:14px;">记字第 ${v.id.replace(/\D/g, '')} 号</div>
                         </div>
 
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; font-weight: bold;">
-                            <div>核算单位：乐享物流有限公司</div>
-                            <div>日期：${v.date}</div>
-                            <div>凭证字号：${v.id}</div>
+                        <div class="v-header-info">
+                            <div style="visibility:hidden;">占位</div>
+                            <div class="v-date-group">
+                                <span>${y}</span>年<span>${m}</span>月<span>${d}</span>日
+                            </div>
+                            <div style="visibility:hidden;">占位</div>
                         </div>
 
-                        <table style="width: 100%; border-collapse: collapse; ${borderStyle}">
+                        <table class="v-table">
                             <thead>
-                                <tr style="color: #e74c3c; height: 50px;">
-                                    <th style="border: 1px solid #e74c3c; width: 30%;">摘 要</th>
-                                    <th style="border: 1px solid #e74c3c; width: 30%;">会计科目</th>
-                                    <th style="border: 1px solid #e74c3c; width: 20%; text-align: center;">借方金额</th>
-                                    <th style="border: 1px solid #e74c3c; width: 20%; text-align: center;">贷方金额</th>
+                                <tr>
+                                    <th rowspan="2" style="width: 22%;">摘 要</th>
+                                    <th rowspan="2" style="width: 18%;">总账科目</th>
+                                    <th rowspan="2" style="width: 15%;">明细科目</th>
+                                    <th rowspan="2" style="width: 30px;">√</th>
+                                    <th style="width: 20%;">借 方 金 额</th>
+                                    <th style="width: 20%;">贷 方 金 额</th>
+                                </tr>
+                                <tr class="money-header-row">
+                                    <th style="padding:0;">
+                                        <div style="border:none;">
+                                            <span>千</span><span>百</span><span>十</span><span>万</span><span>千</span><span>百</span><span>十</span><span>元</span><span>角</span><span>分</span>
+                                        </div>
+                                    </th>
+                                    <th style="padding:0;">
+                                        <div style="border:none;">
+                                            <span>千</span><span>百</span><span>十</span><span>万</span><span>千</span><span>百</span><span>十</span><span>元</span><span>角</span><span>分</span>
+                                        </div>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${linesHTML}
-                                <tr style="height: 50px; ${colorStyle}">
-                                    <td colspan="2" style="border: 1px solid #e74c3c; padding: 8px; font-weight: bold;">合计 (人民币)</td>
-                                    <td style="border: 1px solid #e74c3c; padding: 8px; text-align: right; font-weight: bold;">${v.debit}</td>
-                                    <td style="border: 1px solid #e74c3c; padding: 8px; text-align: right; font-weight: bold;">${v.credit}</td>
+                                <tr style="${v.isRed ? 'color:red;' : ''}">
+                                    <td colspan="3" style="text-align: left; padding-left: 20px; font-weight: bold;">合　　计</td>
+                                    <td></td>
+                                    <td class="money-grid-bg">
+                                        <span style="float:left; font-size:12px; margin-top:3px; margin-left:5px;">¥</span>
+                                        ${totalDebitStr}
+                                    </td>
+                                    <td class="money-grid-bg">
+                                        <span style="float:left; font-size:12px; margin-top:3px; margin-left:5px;">¥</span>
+                                        ${totalCreditStr}
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
 
-                        <div style="display: flex; justify-content: space-between; margin-top: 30px; padding: 0 20px; font-size: 14px;">
-                            <div>财务主管：王总</div>
-                            <div>记账：系统自动</div>
-                            <div>审核：张审核</div>
-                            <div>制单：系统引擎</div>
+                        <div class="attachment-side">附<br>单<br>据<br><br><strong>1</strong><br><br>张</div>
+
+                        <div class="v-footer">
+                            <div>财务主管：<span>___________</span></div>
+                            <div>记账：<span>${v.status==='已记账'?'系统':''}</span></div>
+                            <div>出纳：<span>___________</span></div>
+                            <div>审核：<span>张三</span></div>
+                            <div>制单：<span>${v.user || '系统引擎'}</span></div>
                         </div>
                     </div>
                 `;
             }
-            
+
+
 
 // =========================================================================
             // 39. 科目汇总表 (AcctSubjectSummary) - [终极修复版：精准汇总]
@@ -4757,7 +4908,7 @@ else if (moduleCode === 'ReconDetail') {
                 let mappings = JSON.parse(sessionStorage.getItem('EngineMappings'));
                 if (!mappings) {
                     mappings = [
-                        { id: 'MAP_CST_REV_AIR', name: '空运出口收入确认', type: '客户结算单', condition: "业务线=空运且状态=已确认", template: 'TPL_REV_AIR', status: '禁用' },
+                        { id: 'MAP_CST_REV_AIR', name: '陆运出口收入确认', type: '客户结算单', condition: "业务线=陆运且状态=已确认", template: 'TPL_REV_AIR', status: '禁用' },
                         { id: 'MAP_AP_PAYMENT', name: '供应商运费应付', type: '供应商对账单', condition: "状态=已审批", template: 'TPL_COST_TRUNK', status: '禁用' }
                     ];
                     sessionStorage.setItem('EngineMappings', JSON.stringify(mappings));
@@ -4828,69 +4979,92 @@ else if (moduleCode === 'ReconDetail') {
             }
 
 
-            // =========================================================================
-            // 41. 自动分录模板 (EngineTemplate)
+// =========================================================================
+            // 41. 自动分录模板 (EngineTemplate) - [功能增强版：支持配置]
             // =========================================================================
             else if (moduleCode === 'EngineTemplate') {
+                
+                // 1. 读取模板数据
+                let templates = JSON.parse(sessionStorage.getItem('AutoVoucherTemplates') || "[]");
+                
+                // 如果为空，初始化一个默认模板用于演示
+                if (templates.length === 0) {
+                    templates = [{
+                        id: 'TPL_REV_001',
+                        name: '陆运标准模板',
+                        matchRule: { bizType: '陆运', invoiceType: '专用发票' },
+                        entries: [
+                            { dir: '借', subject: '1122 应收账款', amountType: '价税合计' },
+                            { dir: '贷', subject: '6001 主营业务收入', amountType: '不含税金额' },
+                            { dir: '贷', subject: '2221 应交税费-销项', amountType: '税额' }
+                        ],
+                        status: '启用'
+                    }];
+                    sessionStorage.setItem('AutoVoucherTemplates', JSON.stringify(templates));
+                }
+
+                // 2. 生成列表 HTML
+                const rowsHTML = templates.map(t => `
+                    <tr>
+                        <td>${t.id}</td>
+                        <td><strong>${t.name}</strong></td>
+                        <td>业务线:${t.matchRule.bizType} | 发票:${t.matchRule.invoiceType}</td>
+                        <td>${t.entries.length} 行分录</td>
+                        <td><span style="color:${t.status==='启用'?'#27ae60':'#ccc'}">${t.status}</span></td>
+                        <td>
+                            <a href="javascript:void(0)" onclick="deleteTemplate('${t.id}')" style="color:#e74c3c;">删除</a>
+                        </td>
+                    </tr>
+                `).join('');
+
                 contentHTML += `
                     <h2>自动分录模板 📋</h2>
-                    <p style="color: #7f8c8d;">预定义会计凭证的行项目结构，包括科目、借贷方向、金额和辅助核算项的取值逻辑。</p>
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="">模板用途 (全部)</option>
-                                <option>收入</option>
-                                <option>成本</option>
-                                <option>费用</option>
-                            </select>
-                            <input type="text" placeholder="模板编码 / 名称" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
-                            <button class="btn-primary">查询</button>
-                        </div>
-                    </div>
+                    <p style="color: #7f8c8d;">定义发票开具后自动生成凭证的规则。</p>
                     
-                    <div class="action-bar" style="margin-bottom: 15px;">
-                        <button class="btn-primary" style="background-color: #27ae60;">+ 新增分录模板</button>
-                        <button class="btn-primary" style="background-color: #3498db;">导入模板</button>
+                    <div id="tpl-list-view">
+                        <div class="action-bar" style="margin-bottom: 15px;">
+                            <button class="btn-primary" style="background-color: #27ae60;" onclick="showTemplateForm()">+ 新增分录模板</button>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>模板编码</th><th>模板名称</th><th>适用条件 (触发规则)</th><th>分录行数</th><th>状态</th><th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsHTML}</tbody>
+                        </table>
                     </div>
 
-                    <h3>模板详情预览 (TPL_REV_AIR)</h3>
-                    <p style="color: #2c3e50; margin-bottom: 10px;">名称：空运收入标准模板 | 编码：TPL_REV_AIR</p>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 5%;">行号</th>
-                                <th style="width: 5%;">借/贷</th>
-                                <th style="width: 30%;">科目代码逻辑</th>
-                                <th style="width: 30%;">金额来源/公式</th>
-                                <th>辅助核算项映射</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>10</td>
-                                <td style="color: #2980b9; font-weight: bold;">借</td>
-                                <td>应收科目（按客户组查找）</td>
-                                <td>[单据总金额]</td>
-                                <td>客户代码: [CustomerCode], 业务线: [TransportMode]</td>
-                            </tr>
-                            <tr>
-                                <td>20</td>
-                                <td style="color: #e74c3c; font-weight: bold;">贷</td>
-                                <td>收入科目（按费用类型查找）</td>
-                                <td>[单据不含税净额]</td>
-                                <td>项目: [ProjectID], 成本中心: [CostCenter]</td>
-                            </tr>
-                            <tr>
-                                <td>30</td>
-                                <td style="color: #e74c3c; font-weight: bold;">贷</td>
-                                <td>应交税费 (224101)</td>
-                                <td>[TaxAmount]</td>
-                                <td>无</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div style="text-align: right; margin-top: 15px;">
-                         <button class="btn-primary" style="background-color: #3498db;">编辑模板结构</button>
+                    <div id="tpl-edit-view" style="display:none; background:#fff; padding:20px; border-radius:8px; border:1px solid #ddd;">
+                        <h3 style="margin-top:0;">新增/编辑模板</h3>
+                        <div style="display:flex; gap:15px; margin-bottom:15px;">
+                            <input type="text" id="tpl-name" placeholder="模板名称 (如: 陆运运收入模板)" style="padding:8px; width:200px; border:1px solid #ccc;">
+                            <select id="tpl-bizType" style="padding:8px; border:1px solid #ccc;">
+                                <option value="通用">通用业务</option>
+                                <option value="陆运">陆运</option>
+                                <option value="空运">空运</option>
+                                <option value="海运">海运</option>
+                            </select>
+                            <select id="tpl-invType" style="padding:8px; border:1px solid #ccc;">
+                                <option value="专用发票">增值税专用发票</option>
+                                <option value="普通发票">普通发票</option>
+                            </select>
+                        </div>
+                        
+                        <div style="background:#f9f9f9; padding:10px; border-left:4px solid #3498db; margin-bottom:15px;">
+                            <strong>分录规则配置：</strong>
+                            <ul style="font-size:13px; color:#666; margin:5px 0 0 20px;">
+                                <li>行1 (借)：1122 应收账款 (金额 = 价税合计)</li>
+                                <li>行2 (贷)：6001 主营业务收入 (金额 = 不含税金额)</li>
+                                <li>行3 (贷)：2221 应交税费-销项 (金额 = 税额)</li>
+                            </ul>
+                            <p style="font-size:12px; color:#999;">(为简化原型，此处使用固定逻辑，实际开发需支持动态增减行)</p>
+                        </div>
+
+                        <div style="text-align:right;">
+                            <button class="btn-primary" style="background-color:#95a5a6;" onclick="hideTemplateForm()">取消</button>
+                            <button class="btn-primary" onclick="saveTemplate()">保存配置</button>
+                        </div>
                     </div>
                 `;
             }
@@ -5858,45 +6032,80 @@ else if (moduleCode === 'ReconDetail') {
             loadContent('VoucherDetail');
         }
 
-        // --- 2. 红冲逻辑 (修正版：生成带 class 的新行) ---
-        window.handleRedDash = function(btnElement, voucherId) {
-            const confirmMsg = `⚠️ 确认要对【${voucherId}】进行红字冲销吗？\n系统将生成一张负数金额的红字凭证。`;
-            if (!confirm(confirmMsg)) return;
 
-            const currentRow = btnElement.closest('tr');
-            
-            // 抓取原数据
-            const date = currentRow.querySelector('.val-date').innerText;
-            const summary = currentRow.querySelector('.val-summary').innerText; // 抓取摘要！
-            const debit = currentRow.querySelector('.val-debit').innerText;
-            const credit = currentRow.querySelector('.val-credit').innerText;
+        
+/**
+     * 模拟红冲操作 (修复版：真实生成数据并保存)
+     * @param {HTMLElement} element - 按钮元素
+     * @param {string} originalVoucherId - 原凭证号
+     */
+    window.handleRedDash = function(element, originalVoucherId) {
+        if (!confirm(`⚠️ 【高危操作】\n\n确定要对凭证 ${originalVoucherId} 执行红冲操作吗？\n\n系统将生成一张负数金额的红字凭证，此操作不可逆。`)) return;
 
-            // 变灰原行
-            const statusCell = currentRow.querySelector('.status-cell');
-            if(statusCell) statusCell.innerHTML = '<span style="color:#999;text-decoration:line-through;">已红冲</span>';
-            currentRow.style.backgroundColor = "#f9f9f9";
-            currentRow.style.color = "#ccc";
-            btnElement.innerText = "已冲销";
-            btnElement.onclick = null;
-
-            // 插入红字新行 (注意：这里也加了 val-xxx 类，所以新行也能点查看详情！)
-            const newRowHtml = `
-                <tr style="background-color: #fff0f0; animation: highlight 1s;">
-                    <td class="val-id" style="color:#e74c3c; font-weight:bold;">红-${voucherId}</td>
-                    <td class="val-date">${date}</td>
-                    <td class="val-summary" style="color:#e74c3c;">[冲销] ${summary}</td>
-                    <td class="val-debit" style="color:#e74c3c; font-weight:bold;">-${debit}</td>
-                    <td class="val-credit" style="color:#e74c3c; font-weight:bold;">-${credit}</td>
-                    <td class="status-cell"><span style="color:#27ae60;">已记账</span></td>
-                    <td>
-                        <a href="javascript:void(0)" onclick="openVoucherDetail(this)" style="color:#e74c3c; font-weight:bold;">查看明细</a> | 
-                        <span style="color:#ccc;">自动生成</span>
-                    </td>
-                </tr>
-            `;
-            
-            currentRow.insertAdjacentHTML('afterend', newRowHtml);
+        // 1. 读取现有凭证库
+        let list = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
+        
+        // 2. 找到原始凭证
+        const originalIndex = list.findIndex(v => v.id === originalVoucherId);
+        if (originalIndex === -1) {
+            alert("❌ 错误：未找到原始凭证数据，无法红冲。");
+            return;
         }
+        const original = list[originalIndex];
+
+        // 3. 生成红字凭证 ID
+        // 简单的生成规则：把 "记" 换成 "红"，或者加后缀
+        const redId = originalVoucherId.includes('记') 
+            ? originalVoucherId.replace('记', '红') 
+            : '红' + originalVoucherId;
+
+        // 4. ★★★ 核心：克隆并取反金额 ★★★
+        const redLines = original.lines.map(line => ({
+            summary: `[冲销] ${line.summary}`, // 摘要加前缀
+            account: line.account,
+            // 如果有金额，就加负号
+            debit: line.debit ? `-${line.debit.toString().replace(/-/g,'')}` : '', 
+            credit: line.credit ? `-${line.credit.toString().replace(/-/g,'')}` : ''
+        }));
+
+        // 计算总金额 (负数)
+        const redAmount = `-${original.amount.toString().replace(/-/g,'')}`;
+
+        const redVoucher = {
+            id: redId,
+            date: new Date().toISOString().slice(0, 10),
+            amount: redAmount,
+            user: '当前用户',
+            status: '已记账', // 红冲凭证直接生效
+            isRed: true,      // 标记为红字，详情页会变色
+            lines: redLines   // ★★★ 必须保存分录行，详情页才有数据！
+        };
+
+        // 5. 更新原始凭证状态为“已冲销”
+        list[originalIndex].status = '已冲销';
+
+        // 6. 插入新凭证并保存
+        list.unshift(redVoucher);
+        sessionStorage.setItem('ManualVouchers', JSON.stringify(list));
+
+        // 7. 记录审计日志
+        if (typeof addAuditLog === 'function') {
+            addAuditLog({
+                level: '高危',
+                time: new Date().toLocaleString(),
+                user: '当前用户',
+                module: '凭证管理',
+                action: '执行红冲',
+                detail: `原凭证:${originalVoucherId} -> 红字凭证:${redId}`
+            });
+        }
+
+        alert(`✅ 红冲成功！\n已生成红字凭证：${redId}`);
+        
+        // 8. 刷新列表页面 (让界面重新渲染真实数据)
+        loadContent('VoucherQueryPrint');
+    }
+
 
 
         // ============================================
@@ -7068,7 +7277,7 @@ window.viewPLVoucher = function(voucherId) {
      */
     window.testMapping = function() {
         // 模拟传入一个单据
-        const mockDoc = { type: '客户结算单', status: '已确认', business: '空运' };
+        const mockDoc = { type: '客户结算单', status: '已确认', business: '陆运' };
         
         let mappings = JSON.parse(sessionStorage.getItem('EngineMappings') || "[]");
         // 查找匹配的规则
@@ -7309,30 +7518,45 @@ window.viewPLVoucher = function(voucherId) {
     }
 
 
-/** [升级版] 队列开票 (处理待办 + 状态回写) */
+/** [升级版] 队列开票 (处理待办 + 状态回写 + ★自动生成凭证★) */
     window.generateInvoiceFromQueue = function(sourceId, client, amountStr, index) {
+        
+        // 1. 模拟询问业务类型 (为了演示模板匹配)
+        const bizType = prompt("请输入业务类型以匹配分录模板 (陆运/海运/空运/通用):", "陆运");
+        if(!bizType) return;
+
         if(!confirm(`确认对源单据【${sourceId}】开票吗？`)) return;
 
-        // 1. 移除待办
+        // 2. 移除待办
         let queue = JSON.parse(sessionStorage.getItem('PendingInvoiceQueue') || "[]");
         queue.splice(index, 1);
         sessionStorage.setItem('PendingInvoiceQueue', JSON.stringify(queue));
 
-        // 2. 生成发票
-        // ... (中间生成发票代码保持不变，省略) ...
-        // 请保留您原有的生成 OutputInvoices 的代码
-        // ...
-        // 这里为了简洁直接模拟保存过程：
+        // 3. 生成发票
         let invoices = JSON.parse(sessionStorage.getItem('OutputInvoices') || "[]");
-        invoices.unshift({
-            no: "13000" + Math.floor(Math.random()*90000),
-            client: client, amount: amountStr, tax: '...', total: '...',
-            date: new Date().toISOString().slice(0,10), status: "正常", remark: sourceId
-        });
+        const newInvNo = "13000" + Math.floor(Math.random()*90000);
+        
+        // 构造完整的发票数据对象
+        const invoiceObj = {
+            no: newInvNo,
+            client: client, 
+            amount: amountStr, 
+            tax: '...', 
+            total: '...',
+            date: new Date().toISOString().slice(0,10), 
+            status: "正常", 
+            remark: sourceId,
+            // 关键字段，传给引擎用
+            /* bizType: bizType, */     
+            bizType: '陆运',
+            type: '专用发票',      
+            amountStr: amountStr  
+        };
+        
+        invoices.unshift(invoiceObj);
         sessionStorage.setItem('OutputInvoices', JSON.stringify(invoices));
 
-
-        // 3. ★★★ 核心联动：回写对账单状态为“已开票” ★★★
+        // 4. 回写状态 (对账单/运单) - 保持你原有的逻辑
         let recons = JSON.parse(sessionStorage.getItem('CustomerRecons') || "[]");
         let reconItem = recons.find(r => r.id === sourceId);
         if (reconItem) {
@@ -7340,17 +7564,20 @@ window.viewPLVoucher = function(voucherId) {
             sessionStorage.setItem('CustomerRecons', JSON.stringify(recons));
         }
 
-        // 4. ★★★ 核心联动：回写运单状态为“已开票” (如果需要的话) ★★★
-        // 通常运单到“已对账”就结束了，但如果您希望运单也显示已开票：
-        let waybills = JSON.parse(sessionStorage.getItem('BizWaybills') || "[]");
-        waybills.forEach(w => {
-            if (w.reconId === sourceId) w.status = '已开票';
-        });
-        sessionStorage.setItem('BizWaybills', JSON.stringify(waybills));
+        // 5. ★★★ 核心联动：调用引擎自动生成凭证 ★★★
+        const voucherId = window.autoGenerateVoucher(invoiceObj);
+        
+        let msg = `🎉 开票成功！\n发票号：${newInvNo}`;
+        if (voucherId) {
+            msg += `\n\n⚡ 自动记账成功！\n已根据【${bizType}收入模板】生成凭证：${voucherId}\n请前往【凭证查询/审核】查看。`;
+        } else {
+            msg += `\n\n(未找到匹配的分录模板，未生成凭证)`;
+        }
 
-        alert("🎉 开票成功！\n对账单及关联运单的状态已更新为【已开票】。");
+        alert(msg);
         loadContent('TaxOutputInvoice');
     }
+
 
 
     // 运单结算逻辑
@@ -7983,14 +8210,218 @@ window.viewReconDetail = function(reconId) {
         }
     }
 
-/*     // 5. [修复版] 反结账
-    window.executeReOpen = function() {
-        if (confirm("⚠️ 确认反结账吗？\n数据将恢复可编辑状态。")) {
-            sessionStorage.removeItem('2025-11-MonthClosed');
-            alert("✅ 反结账成功！");
-            loadContent('PeriodEndClose'); // 刷新页面
+    // ==========================================================
+    // ★★★ 会计引擎核心：模板管理与自动生成 ★★★
+    // ==========================================================
+
+    // 1. 显示/隐藏表单
+    window.showTemplateForm = function() {
+        document.getElementById('tpl-list-view').style.display = 'none';
+        document.getElementById('tpl-edit-view').style.display = 'block';
+    }
+    window.hideTemplateForm = function() {
+        document.getElementById('tpl-list-view').style.display = 'block';
+        document.getElementById('tpl-edit-view').style.display = 'none';
+    }
+
+    // 2. 保存模板
+    window.saveTemplate = function() {
+        const name = document.getElementById('tpl-name').value;
+        const bizType = document.getElementById('tpl-bizType').value;
+        const invType = document.getElementById('tpl-invType').value;
+
+        if(!name) return alert("请输入模板名称");
+
+        const newTpl = {
+            id: 'TPL_' + Math.floor(Math.random()*10000),
+            name: name,
+            matchRule: { bizType: bizType, invoiceType: invType },
+            entries: [ // 简化的固定结构，实际可做动态
+                { dir: '借', subject: '1122 应收账款', amountType: '价税合计' },
+                { dir: '贷', subject: '6001 主营业务收入', amountType: '不含税金额' },
+                { dir: '贷', subject: '2221 应交税费-销项', amountType: '税额' }
+            ],
+            status: '启用'
+        };
+
+        let list = JSON.parse(sessionStorage.getItem('AutoVoucherTemplates') || "[]");
+        list.push(newTpl);
+        sessionStorage.setItem('AutoVoucherTemplates', JSON.stringify(list));
+        
+        alert("✅ 模板保存成功！");
+        loadContent('EngineTemplate'); // 刷新
+    }
+
+    // 3. 删除模板
+    window.deleteTemplate = function(id) {
+        if(!confirm("确定删除此模板吗？")) return;
+        let list = JSON.parse(sessionStorage.getItem('AutoVoucherTemplates') || "[]");
+        list = list.filter(t => t.id !== id);
+        sessionStorage.setItem('AutoVoucherTemplates', JSON.stringify(list));
+        loadContent('EngineTemplate');
+    }
+
+
+/** * ★★★ 核心修复：统一价税计算逻辑 (正算) ★★★ 
+     */
+    window.autoGenerateVoucher = function(invoiceData) {
+        console.log("--------------------------------------------------");
+        console.log("🔍 [引擎启动] 开始生成凭证...", invoiceData);
+
+        // 1. 读取模板
+        let templates = JSON.parse(sessionStorage.getItem('AutoVoucherTemplates') || "[]");
+        
+        // 防呆初始化
+        if (templates.length === 0) {
+            console.warn("⚠️ 检测到模板库为空，正在自动初始化默认模板...");
+            templates = [{
+                id: 'TPL_DEF_001',
+                name: '系统默认陆运模板',
+                matchRule: { bizType: '陆运', invoiceType: '专用发票' },
+                entries: [
+                    { dir: '借', subject: '1122 应收账款', amountType: '价税合计' },
+                    { dir: '贷', subject: '6001 主营业务收入', amountType: '不含税金额' },
+                    { dir: '贷', subject: '2221 应交税费-销项', amountType: '税额' }
+                ],
+                status: '启用'
+            }];
+            sessionStorage.setItem('AutoVoucherTemplates', JSON.stringify(templates));
         }
-    } */
+
+        // 2. 寻找匹配的模板
+        const matchedTpl = templates.find(t => {
+            const bizMatch = t.matchRule.bizType === '通用' || 
+                             (invoiceData.bizType && invoiceData.bizType.includes(t.matchRule.bizType));
+            const invMatch = (invoiceData.type && invoiceData.type.includes(t.matchRule.invoiceType));
+            const statusMatch = t.status === '启用';
+            return bizMatch && invMatch && statusMatch;
+        });
+
+        if (!matchedTpl) {
+            console.warn("❌ 匹配失败！未找到符合条件的模板。");
+            return null; 
+        }
+
+        console.log("✅ 匹配成功！使用模板:", matchedTpl.name);
+
+        // ============================================================
+        // 3. ★★★ 核心修复：金额计算改为“正算” (与发票一致) ★★★
+        // ============================================================
+        // 假设输入的 1200 是不含税金额 (Base Amount)
+        const net = parseFloat(invoiceData.amountStr.replace(/,/g, '')); 
+        
+        // 税率 9% (实际项目应从配置读取)
+        const taxRate = 0.09; 
+        
+        const tax = net * taxRate;      // 税额 = 1200 * 0.09 = 108
+        const total = net + tax;        // 总额 = 1200 + 108 = 1308
+        // ============================================================
+
+        // 4. 构造分录行
+        let voucherLines = [];
+        matchedTpl.entries.forEach(rule => {
+            let val = 0;
+            // 根据模板配置取不同的值
+            if (rule.amountType.includes('价税') || rule.amountType.includes('总')) val = total;     // 取 1308
+            else if (rule.amountType.includes('不含税') || rule.amountType.includes('净')) val = net; // 取 1200
+            else if (rule.amountType.includes('税')) val = tax;    // 取 108
+
+            voucherLines.push({
+                summary: `应收${invoiceData.client}运费`, 
+                account: rule.subject,
+                debit: rule.dir === '借' ? val.toFixed(2) : '',
+                credit: rule.dir === '贷' ? val.toFixed(2) : ''
+            });
+        });
+
+        // 5. 生成凭证对象
+        const newVoucherId = "自" + new Date().getFullYear() + Math.floor(Math.random()*10000);
+        const newVoucher = {
+            id: newVoucherId,
+            date: new Date().toISOString().slice(0,10),
+            amount: total.toFixed(2), // 凭证总额应该是价税合计 (1308)
+            user: '系统引擎',
+            status: '待审核', 
+            lines: voucherLines
+        };
+
+        // 6. 保存到凭证库
+        let voucherList = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
+        voucherList.unshift(newVoucher);
+        sessionStorage.setItem('ManualVouchers', JSON.stringify(voucherList));
+
+        // 7. 记录日志
+        if (typeof addAuditLog === 'function') {
+            addAuditLog({
+                level: '系统',
+                time: new Date().toLocaleString(),
+                user: '系统引擎 (Robot)',
+                ip: 'Internal',
+                module: '会计引擎',
+                action: '自动生成凭证',
+                detail: `凭证:${newVoucherId}, 关联发票:${invoiceData.no||'N/A'}, 借方总额:${total.toFixed(2)}`
+            });
+        }
+
+        console.log(`💾 凭证 ${newVoucherId} 已保存。`);
+        return newVoucherId;
+    }
+
+    /** * ★★★ 新增：客户驳回对账单 ★★★
+     */
+    window.rejectRecon = function(id) {
+        const reason = prompt(`模拟：客户拒绝了对账单【${id}】。\n\n请输入驳回原因（如：运费计算错误、货物破损未抵扣）：`);
+        if (!reason) return; // 用户取消
+
+        // 1. 更新状态
+        let recons = JSON.parse(sessionStorage.getItem('CustomerRecons') || "[]");
+        let item = recons.find(r => r.id === id);
+        
+        if (item) {
+            item.status = '已驳回';
+            item.rejectReason = reason; // 记录原因
+            sessionStorage.setItem('CustomerRecons', JSON.stringify(recons));
+            
+            // 2. 联动：把关联运单的状态回退吗？
+            // 策略：通常运单状态可以保持“对账中”，或者回退到“已结算”等待重新生成。
+            // 这里我们简单处理：只改对账单状态。
+            
+            // 3. 记日志
+            if(typeof addAuditLog === 'function') {
+                addAuditLog({
+                    level: '中风险',
+                    time: new Date().toLocaleString(),
+                    user: '外部客户',
+                    module: '客户对账',
+                    action: '驳回对账单',
+                    detail: `单号:${id}, 原因:${reason}`
+                });
+            }
+
+            alert(`⛔ 已驳回！\n状态变更为【已驳回】，请根据客户反馈的原因进行修正。`);
+            loadContent('ReconCustomer');
+        }
+    }
+
+    /**
+     * ★★★ 新增：财务修正后重新提交 ★★★
+     */
+    window.resubmitRecon = function(id) {
+        if(!confirm(`确认已针对客户反馈的问题进行了修正，并重新发送给客户确认吗？`)) return;
+
+        let recons = JSON.parse(sessionStorage.getItem('CustomerRecons') || "[]");
+        let item = recons.find(r => r.id === id);
+        
+        if (item) {
+            item.status = '待客户确认';
+            item.rejectReason = ''; // 清空驳回原因
+            sessionStorage.setItem('CustomerRecons', JSON.stringify(recons));
+            
+            alert("✅ 已重新提交！等待客户再次确认。");
+            loadContent('ReconCustomer');
+        }
+    }
+
 </script>
 
 </body>
