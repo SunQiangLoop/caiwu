@@ -246,85 +246,76 @@ function loadContent(moduleCode, element = null) {
   }
 
   // =========================================================================
-  // 1. 运单结算 (SettlementWaybill) - [修复版：确保变量独立]
+  // 1. 运单结算 (SettlementWaybill) - [最终版：含货物信息字段]
   // =========================================================================
   else if (moduleCode === "SettlementWaybill") {
     // 1. 初始化数据
     let waybills = JSON.parse(sessionStorage.getItem("BizWaybills"));
-    // 强制初始化数据 (如果为空)
-    if (!waybills || waybills.length < 2) {
+
+    // 强制重置数据以显示新字段 (如果旧数据没有goods字段)
+    if (!waybills || !waybills[0].goods) {
       waybills = [
         {
           id: "YD202511001",
           client: "阳光制造有限公司",
-          date: "2025-11-18",
-          amount: "1,200.00",
-          status: "已结算",
-          goods: "电子配件 500箱",
+          bizDate: "2025-11-18",
           route: "上海 -> 苏州",
-          details: { 干线运费: 1000, 提货费: 200 },
+          goods: "电子配件 500箱", // ★ 核心展示字段
+          weight: "5吨",
+          totalAmount: "1,200.00",
+          status: "已结算",
+          details: { 标准运费: 1000, 提货费: 200 },
           reconId: "DZ202511-001",
         },
         {
           id: "YD202511005",
           client: "阳光制造有限公司",
-          date: "2025-11-20",
-          amount: "3,500.00",
-          status: "已结算",
-          goods: "精密仪器 2台",
+          bizDate: "2025-11-20",
           route: "上海 -> 北京",
-          details: { 干线运费: 3000, 送货费: 500 },
+          goods: "精密仪器 2台", // ★ 核心展示字段
+          weight: "2台",
+          totalAmount: "3,500.00",
+          status: "已结算",
+          details: { 标准运费: 3000, 送货费: 500 },
           reconId: "DZ202511-001",
         },
         {
           id: "YD202511003",
           client: "EASY贸易公司",
-          date: "2025-11-19",
-          amount: "2,500.00",
-          status: "已结算",
-          goods: "服装面料 2吨",
+          bizDate: "2025-11-19",
           route: "杭州 -> 广州",
-          details: { 干线运费: 2500 },
-          reconId: "",
-        },
-        {
-          id: "YD202511003-退",
-          client: "EASY贸易公司",
-          date: "2025-11-21",
-          amount: "-500.00",
+          goods: "服装面料 2吨", // ★ 核心展示字段
+          weight: "2吨",
+          totalAmount: "2,500.00",
           status: "已结算",
-          goods: "退货运费",
-          route: "原路退回",
-          details: { 退运费: -500 },
-          isRefund: true,
+          details: { 标准运费: 2500 },
           reconId: "",
         },
         {
           id: "YD202511002",
           client: "张三 (个人)",
-          date: "2025-11-19",
-          amount: "500.00",
-          status: "待结算",
-          goods: "个人行李",
+          bizDate: "2025-11-19",
           route: "同城配送",
-          details: { 运费: 400, 提货费: 100 },
+          goods: "个人行李搬运", // ★ 核心展示字段
+          weight: "1车",
+          totalAmount: "500.00",
+          status: "待结算",
+          details: { 标准运费: 400, 提货费: 100 },
           reconId: "",
         },
       ];
       sessionStorage.setItem("BizWaybills", JSON.stringify(waybills));
     }
 
-    // 2. 生成 HTML (注意这里只使用 waybills 变量)
     const rows = waybills
       .map((w) => {
-        const isPending = w.status === "待结算";
         const isSettled = w.status === "已结算";
-        const isRefundBill = w.amount.toString().includes("-");
+        const isRefundBill = w.totalAmount.toString().includes("-");
 
         let statusColor = "#333";
         let action = "";
 
-        if (isPending) {
+        if (w.status === "待结算") {
           statusColor = "#f39c12";
           action = `<a href="javascript:void(0)" onclick="settleWaybill('${w.id}')" style="color:#27ae60; font-weight:bold;">计算费用</a>`;
         } else if (isSettled) {
@@ -348,17 +339,19 @@ function loadContent(moduleCode, element = null) {
                         <td><input type="checkbox" class="wb-check" value="${
                           w.id
                         }" data-client="${w.client}" ${checkboxState}></td>
-                        <td>${w.id}</td>
+                        <td><span style="font-weight:bold; color:#2980b9;">${
+                          w.id
+                        }</span></td>
                         <td>${w.client}</td>
-                        <td>
-                            <div style="font-weight:bold; font-size:14px;">${
-                              w.amount
-                            }</div>
-                            <div style="font-size:12px; color:#999;">${
-                              w.goods || "-"
-                            }</div>
-                        </td>
-                        <td>${w.date}</td>
+                        
+                        <td style="color:#555;">${w.goods || "-"}</td>
+                        
+                        <td>${w.route}</td>
+                        <td>${w.bizDate}</td>
+                        <td>${w.weight}</td>
+                        <td style="text-align:right; font-weight:bold;">${
+                          w.totalAmount
+                        }</td>
                         <td><span style="color:${statusColor}; font-weight:bold;">${
           w.status
         }</span></td>
@@ -368,12 +361,13 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>运单结算 (Waybill Settlement)</h2>
-                    <p style="color:#7f8c8d;">勾选同一客户的“已结算”运单，点击“生成对账单”进行合并对账。</p>
+                    <h2>运单结算</h2>
+                    <p style="color:#7f8c8d;">管理运单的应收费用计算。确认无误后请点击“结算”锁定金额。</p>
                     
                     <div class="filter-area" style="background:white;padding:15px;margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <input type="text" placeholder="客户名称/运单号" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" placeholder="运单号/客户/货物" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            <input type="date" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
                             <button class="btn-primary">查询</button>
                         </div>
                         <div>
@@ -385,12 +379,309 @@ function loadContent(moduleCode, element = null) {
                         <thead><tr>
                             <th style="width:40px;"><input type="checkbox" onclick="toggleAll(this)"></th>
                             <th>运单号</th>
-                            <th>客户</th>
-                            <th>金额/货物</th>
-                            <th>日期</th>
-                            <th>状态</th>
+                            <th>客户名称</th>
+                            
+                            <th>货物名称</th>
+                            
+                            <th>起止路线</th>
+                            <th>业务日期</th>
+                            <th>计费依据</th>
+                            <th style="text-align:right;">应收合计 (RMB)</th>
+                            <th>结算状态</th>
                             <th>操作</th>
                         </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+  }
+
+  // =========================================================================
+  // 1.2 干线批次结算 (SettlementTrunk) - [成本核算]
+  // =========================================================================
+  else if (moduleCode === "SettlementTrunk") {
+    // 模拟数据
+    const trunkBatches = [
+      {
+        id: "PC-20251120-01",
+        driver: "李铁柱",
+        plate: "苏E·88888",
+        route: "上海 -> 北京",
+        date: "2025-11-20",
+        totalCost: "8,500.00",
+        payType: "现金3000+油卡5500",
+        status: "待结算",
+      },
+      {
+        id: "PC-20251120-02",
+        driver: "王大拿",
+        plate: "沪B·66666",
+        route: "杭州 -> 广州",
+        date: "2025-11-21",
+        totalCost: "12,000.00",
+        payType: "全额现金",
+        status: "已结算",
+      },
+      {
+        id: "PC-20251121-05",
+        driver: "顺丰车队",
+        plate: "京A·55555",
+        route: "苏州 -> 武汉",
+        date: "2025-11-22",
+        totalCost: "6,800.00",
+        payType: "月结",
+        status: "已审核",
+      },
+    ];
+
+    const rows = trunkBatches
+      .map((b) => {
+        let color = "#333";
+        let action = "";
+
+        if (b.status === "待结算") {
+          color = "#f39c12";
+          action = `<a href="#" style="color:#27ae60; font-weight:bold;">计算费用</a>`;
+        } else if (b.status === "已结算") {
+          color = "#27ae60";
+          action = `<a href="#" style="color:#3498db;">提交审核</a> | <a href="#" style="color:#e74c3c;">调整</a>`;
+        } else {
+          color = "#999";
+          action = `<span style="color:#ccc;">查看</span>`;
+        }
+
+        return `
+                        <tr>
+                            <td><span style="font-weight:bold; color:#2980b9;">${b.id}</span></td>
+                            <td>
+                                <div>${b.driver}</div>
+                                <div style="font-size:12px; color:#999;">${b.plate}</div>
+                            </td>
+                            <td>${b.route}</td>
+                            <td>${b.date}</td>
+                            <td style="text-align:right; font-weight:bold;">${b.totalCost}</td>
+                            <td style="font-size:12px; color:#666;">${b.payType}</td>
+                            <td><span style="color:${color}; font-weight:bold;">${b.status}</span></td>
+                            <td>${action}</td>
+                        </tr>
+                    `;
+      })
+      .join("");
+
+    contentHTML += `
+                    <h2>干线批次结算 (Trunk Cost Settlement)</h2>
+                    <p style="color:#7f8c8d;">核算长途运输车辆的单趟成本。支持设置现金、油卡、ETC的支付比例。</p>
+                    
+                    <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px; display:flex; gap:10px;">
+                        <input type="text" placeholder="批次号/车牌/司机" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:200px;">
+                        <input type="date" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <select style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            <option>全部状态</option>
+                            <option>待结算</option>
+                            <option>已结算</option>
+                        </select>
+                        <button class="btn-primary">查询</button>
+                        <button class="btn-primary" style="background-color:#f39c12; margin-left:auto;">+ 补录手工成本</button>
+                    </div>
+
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>发车批次号</th>
+                                <th>司机/车牌</th>
+                                <th>运输路线</th>
+                                <th>发车日期</th>
+                                <th style="text-align:right;">应付运费</th>
+                                <th>支付结构</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+  }
+
+  // =========================================================================
+  // 1.3 短途批次结算 (SettlementShortHaul) - [接送货成本]
+  // =========================================================================
+  else if (moduleCode === "SettlementShortHaul") {
+    const shortBatches = [
+      {
+        id: "SH-20251120-A",
+        driver: "同城-张三",
+        type: "提货",
+        count: "5单",
+        area: "浦东新区",
+        amount: "300.00",
+        status: "待确认",
+      },
+      {
+        id: "SH-20251120-B",
+        driver: "同城-李四",
+        type: "送货",
+        count: "12单",
+        area: "闵行区",
+        amount: "550.00",
+        status: "已确认",
+      },
+      {
+        id: "SH-20251120-C",
+        driver: "外部-货拉拉",
+        type: "临时",
+        count: "1车",
+        area: "松江区",
+        amount: "180.00",
+        status: "已支付",
+      },
+    ];
+
+    const rows = shortBatches
+      .map(
+        (b) => `
+                    <tr>
+                        <td>${b.id}</td>
+                        <td>${b.driver}</td>
+                        <td><span style="padding:2px 5px; border-radius:4px; background:${
+                          b.type === "提货" ? "#e6f7ff" : "#f6ffed"
+                        }; color:${
+          b.type === "提货" ? "#1890ff" : "#52c41a"
+        }; font-size:12px;">${b.type}</span></td>
+                        <td>${b.area}</td>
+                        <td>${b.count}</td>
+                        <td style="text-align:right; font-weight:bold;">${
+                          b.amount
+                        }</td>
+                        <td>${b.status}</td>
+                        <td>
+                            <a href="#" style="color:#3498db;">明细</a>
+                            ${
+                              b.status === "待确认"
+                                ? ' | <a href="#" style="color:#27ae60;">确认</a>'
+                                : ""
+                            }
+                        </td>
+                    </tr>
+                `
+      )
+      .join("");
+
+    contentHTML += `
+                    <h2>短途批次结算 (Short-haul Settlement)</h2>
+                    <p style="color:#7f8c8d;">核算同城提货、送货费用。支持按单、按方数或按车次一口价结算。</p>
+                    
+                    <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px;">
+                        <div style="display:flex; gap:10px;">
+                            <select style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                <option>任务类型 (全部)</option>
+                                <option>提货</option>
+                                <option>送货</option>
+                            </select>
+                            <input type="date" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            <button class="btn-primary">查询</button>
+                            <button class="btn-primary" style="background-color:#27ae60; margin-left:auto;">一键批量计费</button>
+                        </div>
+                    </div>
+
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>任务批次</th>
+                                <th>司机名称</th>
+                                <th>类型</th>
+                                <th>作业区域</th>
+                                <th>作业量</th>
+                                <th style="text-align:right;">结算金额</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+  }
+
+  // =========================================================================
+  // 1.4 计费规则配置 (SettlementRuleConfig) - [核心引擎]
+  // =========================================================================
+  else if (moduleCode === "SettlementRuleConfig") {
+    const rules = [
+      {
+        name: "上海-北京 重货价",
+        type: "收入(对客)",
+        condition: "路线=沪京 & 货物=普货",
+        formula: "单价 * 重量 (0.5元/kg)",
+        status: "启用",
+      },
+      {
+        name: "上海-广州 泡货价",
+        type: "收入(对客)",
+        condition: "路线=沪广 & 货物=轻货",
+        formula: "单价 * 体积 (120元/方)",
+        status: "启用",
+      },
+      {
+        name: "自有车队-公里结算",
+        type: "成本(对车)",
+        condition: "车辆类型=自有",
+        formula: "里程 * 4.5元/km + 路桥实报",
+        status: "启用",
+      },
+      {
+        name: "同城提送-按单算",
+        type: "成本(对车)",
+        condition: "短驳",
+        formula: "50元/票 + 超重费",
+        status: "停用",
+      },
+    ];
+
+    const rows = rules
+      .map(
+        (r) => `
+                    <tr>
+                        <td style="font-weight:bold;">${r.name}</td>
+                        <td><span style="font-size:12px; padding:2px 5px; background:#f5f5f5; border-radius:4px;">${
+                          r.type
+                        }</span></td>
+                        <td style="color:#666; font-size:12px;">${
+                          r.condition
+                        }</td>
+                        <td style="color:#2980b9;">${r.formula}</td>
+                        <td>
+                            <span style="color:${
+                              r.status === "启用" ? "#27ae60" : "#999"
+                            };">● ${r.status}</span>
+                        </td>
+                        <td>
+                            <a href="#" style="color:#3498db;">修改</a> | 
+                            <a href="#" style="color:${
+                              r.status === "启用" ? "#e74c3c" : "#27ae60"
+                            };">${r.status === "启用" ? "停用" : "启用"}</a>
+                        </td>
+                    </tr>
+                `
+      )
+      .join("");
+
+    contentHTML += `
+                    <h2>计费规则配置 (Billing Engine) ⚙️</h2>
+                    <p style="color:#7f8c8d;">配置自动计算运费的公式。系统将在运单结算时自动匹配优先级最高的规则。</p>
+                    
+                    <div class="action-bar" style="margin-bottom:15px; text-align:right;">
+                        <button class="btn-primary" style="background-color:#27ae60;">+ 新增规则</button>
+                    </div>
+
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>规则名称</th>
+                                <th>应用类型</th>
+                                <th>适用条件 (路线/车型)</th>
+                                <th>计费公式</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
                         <tbody>${rows}</tbody>
                     </table>
                 `;
@@ -4388,70 +4679,109 @@ function loadContent(moduleCode, element = null) {
                 `;
   }
 
-            // =========================================================================
-            // 34. 资产卡片 (AssetCard) - [数据增强版：含无形资产]
-            // =========================================================================
-            else if (moduleCode === 'AssetCard') {
-                
-                // 1. 读取数据 (如果为空，则初始化 6 条典型数据)
-                let assets = JSON.parse(sessionStorage.getItem('AssetCards'));
-                
-                if (!assets || assets.length === 0) {
-                    assets = [
-                        // 1. 固定资产 - 生产工具 (重卡)
-                        { 
-                            code: 'FA-TRUCK-001', name: '斯堪尼亚重卡 (苏E88888)', category: '运输车辆', 
-                            dept: '运输部', model: 'G450', 
-                            originalValue: '850,000.00', accumulatedDepr: '150,000.00', netValue: '700,000.00', 
-                            status: '使用中', image: 'https://img.icons8.com/color/96/truck.png' 
-                        },
-                        // 2. 固定资产 - 配送工具 (轻客)
-                        { 
-                            code: 'FA-VAN-005', name: '公司打印机电脑设备', category: '公司设备', 
-                            dept: '行政部', model: 'N800', 
-                            originalValue: '120,000.00', accumulatedDepr: '20,000.00', netValue: '100,000.00', 
-                            status: '使用中', image: 'https://img.icons8.com/color/96/shuttle.png' 
-                        },
-                        // 3. ★ 无形资产 - 软件 (您特别要求的)
-                        { 
-                            code: 'IA-SOFT-001', name: '自研物流CRM管理系统', category: '无形资产', 
-                            dept: '研发部', model: 'V2.0 企业版', 
-                            originalValue: '500,000.00', accumulatedDepr: '100,000.00', netValue: '400,000.00', 
-                            status: '使用中', image: 'https://img.icons8.com/color/100/code.png' 
-                        },
-                        // 4. 固定资产 - 仓储设备
-                        { 
-                            code: 'FA-EQP-022', name: '合力3吨柴油叉车', category: '仓储设备', 
-                            dept: '仓储部', model: 'CPCD30', 
-                            originalValue: '65,000.00', accumulatedDepr: '15,000.00', netValue: '50,000.00', 
-                            status: '使用中', image: 'https://img.icons8.com/color/97/fork-lift.png' 
-                        },
-                        // 5. 无形资产 - 资质许可
-                        { 
-                            code: 'IA-LIC-002', name: '道路运输经营许可证', category: '无形资产', 
-                            dept: '总经办', model: '长期许可', 
-                            originalValue: '20,000.00', accumulatedDepr: '5,000.00', netValue: '15,000.00', 
-                            status: '使用中', image: 'https://img.icons8.com/color/98/certificate.png' 
-                        },
-                        // 6. 其他资产 - 办公装修
-                        { 
-                            code: 'OA-DEC-001', name: '总部办公室装修工程', category: '长期待摊费用', 
-                            dept: '行政部', model: '-', 
-                            originalValue: '300,000.00', accumulatedDepr: '120,000.00', netValue: '180,000.00', 
-                            status: '使用中', image: 'https://img.icons8.com/color/99/paint-roller.png' 
-                        }
-                    ];
-                    sessionStorage.setItem('AssetCards', JSON.stringify(assets));
-                }
+  // =========================================================================
+  // 34. 资产卡片 (AssetCard) - [数据增强版：含无形资产]
+  // =========================================================================
+  else if (moduleCode === "AssetCard") {
+    // 1. 读取数据 (如果为空，则初始化 6 条典型数据)
+    let assets = JSON.parse(sessionStorage.getItem("AssetCards"));
 
-                // 2. 生成表格行 (保持之前的逻辑)
-                const rows = assets.map(a => {
-                    const imgUrl = a.image || 'https://via.placeholder.com/40?text=Asset';
-                    const statusColor = a.status === '使用中' ? '#27ae60' : '#999';
-                    // 特殊标记无形资产
-                    const typeLabel = a.category === '无形资产' ? '<span style="background:#e6f7ff; color:#1890ff; font-size:10px; padding:2px 4px; border-radius:2px;">无形</span> ' : '';
+    if (!assets || assets.length === 0) {
+      assets = [
+        // 1. 固定资产 - 生产工具 (重卡)
+        {
+          code: "FA-TRUCK-001",
+          name: "斯堪尼亚重卡 (苏E88888)",
+          category: "运输车辆",
+          dept: "运输部",
+          model: "G450",
+          originalValue: "850,000.00",
+          accumulatedDepr: "150,000.00",
+          netValue: "700,000.00",
+          status: "使用中",
+          image: "https://img.icons8.com/color/96/truck.png",
+        },
+        // 2. 固定资产 - 配送工具 (轻客)
+        {
+          code: "FA-VAN-005",
+          name: "公司打印机电脑设备",
+          category: "公司设备",
+          dept: "行政部",
+          model: "N800",
+          originalValue: "120,000.00",
+          accumulatedDepr: "20,000.00",
+          netValue: "100,000.00",
+          status: "使用中",
+          image: "https://img.icons8.com/color/96/shuttle.png",
+        },
+        // 3. ★ 无形资产 - 软件 (您特别要求的)
+        {
+          code: "IA-SOFT-001",
+          name: "自研物流CRM管理系统",
+          category: "无形资产",
+          dept: "研发部",
+          model: "V2.0 企业版",
+          originalValue: "500,000.00",
+          accumulatedDepr: "100,000.00",
+          netValue: "400,000.00",
+          status: "使用中",
+          image: "https://img.icons8.com/color/100/code.png",
+        },
+        // 4. 固定资产 - 仓储设备
+        {
+          code: "FA-EQP-022",
+          name: "合力3吨柴油叉车",
+          category: "仓储设备",
+          dept: "仓储部",
+          model: "CPCD30",
+          originalValue: "65,000.00",
+          accumulatedDepr: "15,000.00",
+          netValue: "50,000.00",
+          status: "使用中",
+          image: "https://img.icons8.com/color/97/fork-lift.png",
+        },
+        // 5. 无形资产 - 资质许可
+        {
+          code: "IA-LIC-002",
+          name: "道路运输经营许可证",
+          category: "无形资产",
+          dept: "总经办",
+          model: "长期许可",
+          originalValue: "20,000.00",
+          accumulatedDepr: "5,000.00",
+          netValue: "15,000.00",
+          status: "使用中",
+          image: "https://img.icons8.com/color/98/certificate.png",
+        },
+        // 6. 其他资产 - 办公装修
+        {
+          code: "OA-DEC-001",
+          name: "总部办公室装修工程",
+          category: "长期待摊费用",
+          dept: "行政部",
+          model: "-",
+          originalValue: "300,000.00",
+          accumulatedDepr: "120,000.00",
+          netValue: "180,000.00",
+          status: "使用中",
+          image: "https://img.icons8.com/color/99/paint-roller.png",
+        },
+      ];
+      sessionStorage.setItem("AssetCards", JSON.stringify(assets));
+    }
 
-                    return `
+    // 2. 生成表格行 (保持之前的逻辑)
+    const rows = assets
+      .map((a) => {
+        const imgUrl = a.image || "https://via.placeholder.com/40?text=Asset";
+        const statusColor = a.status === "使用中" ? "#27ae60" : "#999";
+        // 特殊标记无形资产
+        const typeLabel =
+          a.category === "无形资产"
+            ? '<span style="background:#e6f7ff; color:#1890ff; font-size:10px; padding:2px 4px; border-radius:2px;">无形</span> '
+            : "";
+
+        return `
                         <tr>
                             <td style="text-align:center;">
                                 <img src="${imgUrl}" style="width: 32px; height: 32px; object-fit: contain; cursor: pointer;" title="点击预览">
@@ -4475,9 +4805,10 @@ function loadContent(moduleCode, element = null) {
                             </td>
                         </tr>
                     `;
-                }).join('');
+      })
+      .join("");
 
-                contentHTML += `
+    contentHTML += `
                     <h2>固定/无形资产卡片 (Assets Management)</h2>
                     <p style="color: #7f8c8d;">统一管理公司的固定资产（车辆、设备）及无形资产（软件、牌照），支持分类折旧与摊销。</p>
                     
@@ -4517,7 +4848,7 @@ function loadContent(moduleCode, element = null) {
                     </table>
                     
                     `;
-            }
+  }
 
   // =========================================================================
   // 35. 折旧计算 (Asset Depreciation)
