@@ -29,7 +29,8 @@ window.saveAssetCard = function() {
     // 如果是车辆，随机给个卡车图；如果是电脑，给个电脑图
     let imgUrl = 'https://via.placeholder.com/100?text=Asset';
     if (type === '运输车辆') imgUrl = 'https://img.icons8.com/color/96/truck.png'; 
-    if (type === '办公设备') imgUrl = 'https://img.icons8.com/color/96/workstation.png';
+    if (type === '办公设备') imgUrl = 'img/computer.ico';
+    if (type === '总部办公室装修工程') imgUrl = 'img/fixHouse.ico';
 
     const newAsset = {
         code: code,

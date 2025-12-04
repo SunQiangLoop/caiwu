@@ -102,7 +102,7 @@ function loadContent(moduleCode, element = null) {
   // =========================================================================
 
   // =========================================================================
-  // 0. 仪表盘 (Dashboard) - [升级版：带图形化流程导航]
+  // 0. 仪表盘 - [图形化流程导航]
   // =========================================================================
   if (moduleCode === "Dashboard") {
     // --- 1. 定义流程导航的 CSS 样式 ---
@@ -468,7 +468,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>干线批次结算 (Trunk Cost Settlement)</h2>
+                    <h2>干线批次结算 </h2>
                     <p style="color:#7f8c8d;">核算长途运输车辆的单趟成本。支持设置现金、油卡、ETC的支付比例。</p>
                     
                     <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px; display:flex; gap:10px;">
@@ -566,7 +566,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>短途批次结算 (Short-haul Settlement)</h2>
+                    <h2>短途批次结算 </h2>
                     <p style="color:#7f8c8d;">核算同城提货、送货费用。支持按单、按方数或按车次一口价结算。</p>
                     
                     <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px;">
@@ -664,7 +664,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>计费规则配置 (Billing Engine) ⚙️</h2>
+                    <h2>计费规则配置  ⚙️</h2>
                     <p style="color:#7f8c8d;">配置自动计算运费的公式。系统将在运单结算时自动匹配优先级最高的规则。</p>
                     
                     <div class="action-bar" style="margin-bottom:15px; text-align:right;">
@@ -856,7 +856,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>客户对账 (Customer Reconciliation)</h2>
+                    <h2>客户对账 </h2>
                     <div class="filter-area" style="background:white;padding:15px;margin-bottom:20px;">
                         <button class="btn-primary" onclick="loadContent('ReconCustomer')">刷新列表</button>
                     </div>
@@ -1238,7 +1238,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>客户收款核销 (Collection & Verification)</h2>
+                    <h2>客户收款核销 </h2>
                     <p style="color: #7f8c8d;">财务/出纳在此确认银行流水，并将其与应收账款进行匹配消账。</p>
                     
                     <div class="filter-area" style="background-color: white; padding: 15px; margin-bottom: 20px;">
@@ -4712,7 +4712,7 @@ function loadContent(moduleCode, element = null) {
           accumulatedDepr: "20,000.00",
           netValue: "100,000.00",
           status: "使用中",
-          image: "https://img.icons8.com/color/96/shuttle.png",
+          image: 'img/computer.ico',
         },
         // 3. ★ 无形资产 - 软件 (您特别要求的)
         {
@@ -4764,7 +4764,7 @@ function loadContent(moduleCode, element = null) {
           accumulatedDepr: "120,000.00",
           netValue: "180,000.00",
           status: "使用中",
-          image: "https://img.icons8.com/color/99/paint-roller.png",
+          image: "img/fixHouse.ico",
         },
       ];
       sessionStorage.setItem("AssetCards", JSON.stringify(assets));
@@ -4809,7 +4809,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>固定/无形资产卡片 (Assets Management)</h2>
+                    <h2>固定/无形资产卡片 </h2>
                     <p style="color: #7f8c8d;">统一管理公司的固定资产（车辆、设备）及无形资产（软件、牌照），支持分类折旧与摊销。</p>
                     
                     <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px;">
@@ -7569,7 +7569,6 @@ function loadContent(moduleCode, element = null) {
                                 <div style="font-size:12px; color:#999; margin-top:3px;">* 可与社保基数不同</div>
                             </div>
                         </div>
-
                         <div style="margin-top: 40px; text-align: right; padding-top: 20px; border-top: 1px solid #eee;">
                             <button class="btn-primary" style="background-color: #e74c3c; float:left;" onclick="alert('删除功能暂略')">删除档案</button>
                             <button class="btn-primary" style="background-color: #95a5a6; margin-right:10px;" onclick="loadContent('HREmployee')">取消</button>
@@ -7687,12 +7686,11 @@ function loadContent(moduleCode, element = null) {
   }
 
   // =========================================================================
-  // 90. 客户档案 (BaseCustomer) - [最终版：支持新增字段 & 数据持久化]
+  // 90. 客户档案 (BaseCustomer) - [支持新增字段 & 数据持久化]
   // =========================================================================
   else if (moduleCode === "BaseCustomer") {
     // 1. 定义默认数据 (写死在代码里的老数据)
     const defaultCustomers = [
-      /*   { id: 'CUST-1024', name: '阳光制造有限公司', taxId: '91320100MA1...', type: '月结', limit: '1200.00', days: '30', status: '正常' }, */
       {
         id: "CUST-8812",
         name: "张三 (个人)",
@@ -7804,13 +7802,13 @@ function loadContent(moduleCode, element = null) {
                 `;
   } else {
     contentHTML += `<p>已切换到 **${getModuleName(moduleCode)}** 模块。</p>
-                                 <p>此处将加载该功能的详细操作界面，例如：</p>
-                                 <ul>
+                                <p>此处将加载该功能的详细操作界面，例如：</p>
+                                <ul>
                                     <li>如果是 **报表**，则显示筛选条件和报表预览。</li>
                                     <li>如果是 **录入**，则显示数据表单。</li>
                                     <li>如果是 **查询**，则显示查询条件和数据列表。</li>
-                                 </ul>
-                                 <p style="color: #999;">（此为原型图模拟内容，请基于此结构进行后续的详细页面设计）</p>`;
+                                </ul>
+                                <p style="color: #999;">（此为原型图模拟内容，请基于此结构进行后续的详细页面设计）</p>`;
   }
 
   // =========================================================================

@@ -1,5 +1,5 @@
         // ==========================================================
-        // 凭证录入与审核 - 业务逻辑函数 (最终整合版)
+        // 凭证录入与审核 - 业务逻辑函数
         // ==========================================================
 
         /** 1. 自动计算合计金额 */
@@ -31,12 +31,12 @@
             }
         }
 
-        /** 2. 动态添加分录行 (修复版：支持回填参数) */
+        /** 2. 动态添加分录行 (支持回填参数) */
         window.addEntryRow = function (data = null) {
             const tbody = document.getElementById('entry-table-body');
             if (!tbody) return;
 
-            // 核心修复：读取传入的 data 对象
+            // 读取传入的 data 对象
             const summary = data ? data.summary : '';
             const account = data ? data.account : '';
             const debit = data ? data.debit : '';
@@ -86,9 +86,9 @@
             calculateTotals();
         }
 
-        /** * 5. [修复版] 保存/提交凭证 (含引擎校验 + 修复重复ID问题) */
+        /** * 5.  保存/提交凭证 (含引擎校验 + 修复重复ID问题) */
         window.saveVoucher = function (status) {
-            // --- 1. 引擎校验 (保持不变) ---
+            // --- 1. 引擎校验  ---
             const mappings = JSON.parse(sessionStorage.getItem('EngineMappings') || "[]");
             // 如果没有启用的规则，拦截 (模拟强管控)
             if (!mappings.some(m => m.status === '启用')) return alert("⛔ 【拦截】会计引擎已关闭，禁止录入！");
@@ -174,7 +174,7 @@
         }
 
 
-        /** 6. [修复版] 编辑凭证 (真实回填数据) */
+        /** 6.  编辑凭证 (真实回填数据) */
         window.editVoucher = function (id) {
             // 1. 读取数据
             const list = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
