@@ -4365,7 +4365,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>会计科目 (Chart of Accounts)</h2>
+                    <h2>会计科目 </h2>
                     <p style="color: #7f8c8d;">管理企业的会计科目体系。支持多级科目设置（如 1001 -> 100101）。</p>
                     
                     <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
