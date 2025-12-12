@@ -687,101 +687,6 @@ function loadContent(moduleCode, element = null) {
                 `;
   }
 
-  // =========================================================================
-  // 2.1. 对账单详情页 (ReconDetail) - [新增：表格化明细]
-  // =========================================================================
-  else if (moduleCode === "ReconDetail") {
-    const recon = window.g_currentRecon || {
-      id: "-",
-      client: "-",
-      amount: "0",
-      period: "-",
-    };
-
-    // 1. 从运单库查找关联运单
-    const allWaybills = JSON.parse(
-      sessionStorage.getItem("BizWaybills") || "[]"
-    );
-    // 核心过滤：只找 reconId 等于当前对账单号的
-    const details = allWaybills.filter((w) => w.reconId === recon.id);
-
-    // 2. 生成明细行 HTML
-    const rows = details
-      .map((d, index) => {
-        // 简单的负数判断
-        const amtNum = parseFloat(d.amount.toString().replace(/,/g, ""));
-        const isRefund = amtNum < 0;
-        const color = isRefund ? "#c0392b" : "#333";
-        const typeLabel = isRefund
-          ? '<span style="color:red; font-weight:bold;">[退款]</span> '
-          : '<span style="color:#27ae60;">[运单]</span> ';
-
-        return `
-                        <tr style="color:${color}; background-color: ${
-          isRefund ? "#fff0f0" : "#fff"
-        };">
-                            <td>${index + 1}</td>
-                            <td>${d.id}</td>
-                            <td>${d.date}</td>
-                            <td>${d.route || "常规路线"}</td>
-                            <td>${typeLabel}${d.goods || "普通货物"}</td>
-                            <td style="text-align:right; font-weight:bold;">${
-                              d.amount
-                            }</td>
-                            <td>${d.status}</td>
-                            <td><a href="#" style="color:#3498db;">查看</a></td>
-                        </tr>
-                    `;
-      })
-      .join("");
-
-    const emptyRow = rows
-      ? ""
-      : '<tr><td colspan="8" style="text-align:center; padding:20px; color:#999;">暂无关联运单明细</td></tr>';
-
-    contentHTML += `
-                    <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; gap:10px;">
-                            <button class="btn-primary" style="background-color: #95a5a6;" onclick="loadContent('ReconCustomer')"> < 返回对账列表</button>
-                            <h2>对账单详情：<span style="color:#2980b9;">${recon.id}</span></h2>
-                        </div>
-                        <div style="text-align:right;">
-                            <div style="font-size:14px; color:#666;">客户名称</div>
-                            <div style="font-weight:bold; font-size:16px;">${recon.client}</div>
-                        </div>
-                    </div>
-
-                    <div class="filter-area" style="background:white; padding:20px; margin-bottom:20px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <span style="font-weight:bold; font-size:18px;">对账总额：<span style="color:#e74c3c;">${recon.amount}</span> RMB</span>
-                            <span style="margin-left:20px; color:#666;">| &nbsp; 账期：${recon.period} &nbsp; | &nbsp; 包含单据：${details.length} 笔</span>
-                        </div>
-                        <div>
-                            <button class="btn-primary" style="background-color:#3498db;">导出明细 Excel</button>
-                            <button class="btn-primary" style="background-color:#27ae60;">打印对账单</button>
-                        </div>
-                    </div>
-
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th style="width:50px;">序号</th>
-                                <th>运单号</th>
-                                <th>下单时间</th>
-                                <th>线路</th>
-                                <th>货物名称</th>
-                                <th style="text-align:right;">金额 (RMB)</th>
-                                <th>状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rows}
-                            ${emptyRow}
-                        </tbody>
-                    </table>
-                `;
-  }
 
   // =========================================================================
   // 2. 客户对账 (ReconCustomer) - [修复版：独立变量]
@@ -866,6 +771,88 @@ function loadContent(moduleCode, element = null) {
                     </table>
                 `;
   }
+
+    // =========================================================================
+    // 2.1. 对账单详情页 (ReconDetail) - [新增：表格化明细]
+    // =========================================================================
+    else if (moduleCode === 'ReconDetail') {
+        // 1. 获取当前要查看的对账单对象
+        const recon = window.g_currentRecon || { id: '-', client: '-', amount: '0', period: '-' };
+
+        // 2. 从运单库查找关联的运单 (这是核心：根据 reconId 筛选)
+        const allWaybills = JSON.parse(sessionStorage.getItem('BizWaybills') || "[]");
+        
+        // 筛选逻辑：只找 reconId 等于当前对账单号的运单
+        const details = allWaybills.filter(w => w.reconId === recon.id);
+
+        // 3. 生成明细行 HTML
+        const rows = details.map((d, index) => {
+            // 简单的负数判断 (退款标红)
+            const amtNum = parseFloat(d.totalAmount ? d.totalAmount.replace(/,/g, '') : "0");
+            const isRefund = amtNum < 0;
+            const color = isRefund ? '#c0392b' : '#333';
+            const typeLabel = isRefund ? '<span style="color:red; font-weight:bold;">[退款]</span> ' : '';
+
+            return `
+                <tr style="color:${color}; background-color: ${isRefund ? '#fff0f0' : '#fff'};">
+                    <td>${index + 1}</td>
+                    <td><strong>${d.id}</strong></td>
+                    <td>${d.bizDate || '-'}</td>
+                    <td>${d.route || '常规路线'}</td>
+                    <td>${typeLabel}${d.goods || '普通货物'}</td>
+                    <td>${d.weight || '-'}</td>
+                    <td style="text-align:right; font-weight:bold;">${d.totalAmount || d.amount}</td>
+                    <td>${d.status}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const emptyRow = rows ? '' : '<tr><td colspan="8" style="text-align:center; padding:20px; color:#999;">暂无关联运单明细，请检查数据源。</td></tr>';
+
+        contentHTML += `
+            <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <button class="btn-primary" style="background-color: #95a5a6;" onclick="loadContent('ReconCustomer')"> < 返回列表</button>
+                    <h2>对账单详情：<span style="color:#2980b9;">${recon.id}</span></h2>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:14px; color:#666;">客户名称</div>
+                    <div style="font-weight:bold; font-size:16px;">${recon.client}</div>
+                </div>
+            </div>
+
+            <div class="filter-area" style="background:white; padding:20px; margin-bottom:20px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; border-left: 5px solid #2980b9;">
+                <div>
+                    <span style="font-weight:bold; font-size:18px;">本单总额：<span style="color:#e74c3c; font-family:'Courier New';">${recon.amount}</span> RMB</span>
+                    <span style="margin-left:20px; color:#666;">| &nbsp; 账期：${recon.period} &nbsp; | &nbsp; 包含单据：<strong>${details.length}</strong> 笔</span>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-primary" style="background-color:#27ae60;" onclick="alert('模拟：正在导出 Excel...')">📥 导出 Excel</button>
+                    <button class="btn-primary" style="background-color:#34495e;" onclick="window.print()">🖨 打印清单</button>
+                </div>
+            </div>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:50px;">序号</th>
+                        <th>运单号</th>
+                        <th>业务日期</th>
+                        <th>运输路线</th>
+                        <th>货物名称</th>
+                        <th>计费重量/单位</th>
+                        <th style="text-align:right;">应收金额 (RMB)</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                    ${emptyRow}
+                </tbody>
+            </table>
+        `;
+    }
+
 
   // =========================================================================
   // 3. 承运商对账 (ReconCarrier)
@@ -4712,7 +4699,7 @@ function loadContent(moduleCode, element = null) {
           accumulatedDepr: "20,000.00",
           netValue: "100,000.00",
           status: "使用中",
-          image: 'img/computer.ico',
+          image: "img/computer.ico",
         },
         // 3. ★ 无形资产 - 软件 (您特别要求的)
         {
@@ -4979,143 +4966,149 @@ function loadContent(moduleCode, element = null) {
   }
 
   // =========================================================================
-  // 37. 凭证录入 (VoucherEntryReview) - [终极修复版：找回录入界面]
+  // 37. 凭证录入 (VoucherEntryReview) - [智能交互重构版]
   // =========================================================================
   else if (moduleCode === "VoucherEntryReview") {
+    // 1. 读取历史凭证列表 (保持不变)
     const savedVouchers = JSON.parse(
       sessionStorage.getItem("ManualVouchers") || "[]"
     );
 
+    // 生成列表行 HTML (保持不变，省略部分重复代码，直接用之前的 logic)
     const voucherRows = savedVouchers
       .map((v) => {
-        let statusColor = "#999";
-        if (v.status === "待审核") statusColor = "#f39c12";
-        else if (v.status === "已驳回") statusColor = "#c0392b";
-        else if (v.status === "已审核" || v.status === "已记账")
-          statusColor = "#27ae60";
-
-        let actionBtns = "";
-        // 只有未生效的凭证可以编辑
-        if (
-          v.status === "待审核" ||
-          v.status === "已驳回" ||
-          v.status === "草稿"
-        ) {
-          actionBtns = `
-                            <a href="javascript:void(0)" onclick="editVoucher('${v.id}')" style="color:#3498db;">编辑</a> | 
-                            <a href="javascript:void(0)" onclick="deleteVoucher(this, '${v.id}')" style="color:#e74c3c;">删除</a>
-                        `;
-        } else {
-          actionBtns = `<a href="javascript:void(0)" onclick="openVoucherDetail(this)" style="color:#999;">查看</a>`;
-        }
-
-        return `
-                        <tr>
-                            <td>${v.id}</td>
-                            <td>${v.date}</td>
-                            <td style="text-align:right; font-family:'Courier New'; font-weight:bold;">${v.amount}</td>
-                            <td>${v.user}</td>
-                            <td><span style="color: ${statusColor}; font-weight: bold;">${v.status}</span></td>
-                            <td>${actionBtns}</td>
-                        </tr>
-                    `;
+        let statusColor =
+          v.status === "已审核" || v.status === "已记账"
+            ? "#27ae60"
+            : "#f39c12";
+        return `<tr>
+            <td>${v.id}</td>
+            <td>${v.date}</td>
+            <td style="text-align:right; font-weight:bold;">${v.amount}</td>
+            <td>${v.user}</td>
+            <td><span style="color: ${statusColor}; font-weight: bold;">${v.status}</span></td>
+            <td><a href="javascript:void(0)" onclick="openVoucherDetail(this)" style="color:#3498db;">查看</a></td>
+        </tr>`;
       })
       .join("");
 
     contentHTML += `
-                    <h2>凭证录入</h2>
-                    <p style="color: #7f8c8d;">用于出纳或制单人员手动录入会计凭证。</p>
+        <h2>凭证录入 (智能模式)</h2>
+        <p style="color: #7f8c8d;">选择业务场景和结算方式，系统将自动生成标准凭证。</p>
 
-                    <div class="action-bar" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px;">
-                        <button class="btn-primary" style="background-color: #27ae60;" onclick="resetVoucherForm()">🔄 重置/新建</button>
-                        <div style="font-weight: bold; color: #2980b9;">当前生成凭证号：<span id="current-v-id">记${new Date().getFullYear()}11${Math.floor(
+        <div class="action-bar" style="margin-bottom: 20px; border-bottom: 2px solid #ccc; padding-bottom: 10px;">
+            <button class="btn-primary" style="background-color: #27ae60;" onclick="resetSmartForm()">🔄 重置表单</button>
+            <div style="float:right; font-weight: bold; color: #2980b9;">
+                凭证号：<span id="current-v-id">记${new Date().getFullYear()}11${Math.floor(
       Math.random() * 1000 + 1000
-    )}</span></div>
+    )}</span>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 20px; align-items: flex-start;">
+            
+            <div style="flex: 1; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #eee;">
+                <h3 style="margin-top:0; color:#333; border-bottom:1px solid #eee; padding-bottom:10px;">📝 业务信息录入</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; color:#666; font-size:12px; margin-bottom:5px;">业务场景 (对方科目)</label>
+                    <select id="biz-scenario" class="smart-input" onchange="updateSmartPreview()" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-weight:bold;">
+                        <option value="income" data-subject="6001 主营业务收入" data-dir="credit">收取运费收入</option>
+                        <option value="ar_cost" data-subject="1122 应收账款" data-dir="credit">收回客户欠款 (核销应收)</option>
+                        <option value="cost" data-subject="6401 主营业务成本" data-dir="debit">支付司机运费</option>
+                        <option value="exp_admin" data-subject="6602 管理费用" data-dir="debit">支付办公/行政费用</option>
+                        <option value="tax" data-subject="2221 应交税费" data-dir="debit">缴纳税款</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; color:#666; font-size:12px; margin-bottom:5px;">往来单位 / 摘要补充</label>
+                    <input type="text" id="biz-summary" class="smart-input" oninput="updateSmartPreview()" placeholder="例如：Google科技技术有限公司 / 11月房租" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; color:#666; font-size:12px; margin-bottom:5px;">金额 (RMB)</label>
+                    <input type="number" id="biz-amount" class="smart-input" oninput="updateSmartPreview()" placeholder="0.00" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:16px; color:#e74c3c; font-weight:bold;">
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <label style="display:block; color:#2980b9; font-size:12px; margin-bottom:5px; font-weight:bold;">资金账户 / 结算方式</label>
+                    <select id="settlement-account" class="smart-input" onchange="updateSmartPreview()" style="width:100%; padding:10px; border:1px solid #2980b9; border-radius:4px; background:#f0f7ff;">
+                        <option value="bank_icbc" data-subject="100201 银行存款-工行" data-type="money">🏦 工商银行基本户</option>
+                        <option value="bank_ali" data-subject="101201 其他货币资金-支付宝" data-type="money">📱 企业支付宝</option>
+                        <option value="cash" data-subject="1001 库存现金" data-type="money">💴 财务部现金</option>
+                        <option disabled>──────────</option>
+                        <option value="offset_ap" data-subject="2202 应付账款" data-type="transfer">🔄 供应商抵扣 (挂账)</option>
+                        <option value="offset_ar" data-subject="1122 应收账款" data-type="transfer">🔄 客户预收冲抵</option>
+                    </select>
+                </div>
+
+                <div style="text-align: right;">
+                    <button class="btn-primary" style="background-color: #3498db; padding: 10px 30px;" onclick="saveSmartVoucher()">💾 确认并保存凭证</button>
+                </div>
+            </div>
+
+            <div style="flex: 1.2; background: #fdfdfd; padding: 20px; border-radius: 8px; border: 1px dashed #bbb;">
+                <h3 style="margin-top:0; color:#555; display:flex; justify-content:space-between;">
+                    <span>📜 凭证实时预览</span>
+                    <span id="preview-tag" style="background:#27ae60; color:#fff; padding:2px 8px; border-radius:4px; font-size:14px;">收款凭证</span>
+                </h3>
+                
+                <div class="voucher-preview-card" style="border:1px solid #333; margin-top:15px; background:#fff; padding:10px;">
+                    <div style="text-align:center; font-size:18px; font-weight:bold; margin-bottom:10px; border-bottom:1px double #ccc; padding-bottom:5px;">
+                        记 账 凭 证
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
+                        <span>日期：<span id="preview-date">${
+                          new Date().toISOString().split("T")[0]
+                        }</span></span>
+                        <span>附件：1 张</span>
                     </div>
                     
-                    <h3>凭证录入区域</h3>
-                    <div style="border: 1px solid #ccc; padding: 15px; border-radius: 4px; background-color: #f9f9f9; margin-bottom: 20px;">
-                        <div style="display: flex; gap: 20px; margin-bottom: 10px;">
-                            <span>日期: <input type="date" id="v-date" value="2025-11-20" style="padding: 5px; border: 1px solid #ccc;"></span>
-                            <span>附单据数: <input type="number" value="1" style="width: 50px; padding: 5px; border: 1px solid #ccc;"></span>
-                            <span>币种: <select style="padding: 5px; border: 1px solid #ccc;"><option>RMB</option></select></span>
-                        </div>
-                        
-                        <table class="data-table" style="width: 100%; margin-top: 10px;">
-                            <thead>
-                                <tr>
-                                    <th style="width: 30%;">摘要</th>
-                                    <th style="width: 30%;">会计科目</th>
-                                    <th style="width: 15%; text-align: right;">借方金额 (RMB)</th>
-                                    <th style="width: 15%; text-align: right;">贷方金额 (RMB)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="entry-table-body">
-                                <tr>
-                                    <td><input type="text" class="input-summary" placeholder="摘要" style="width: 95%;"></td>
-                                    <td><input type="text" class="input-account" placeholder="科目代码" style="width: 95%;"></td>
-                                    <td><input type="number" class="input-debit" oninput="calculateTotals()" placeholder="0.00" style="width: 95%; text-align: right;"></td>
-                                    <td><input type="number" class="input-credit" oninput="calculateTotals()" placeholder="0.00" style="width: 95%; text-align: right;"></td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div style="display:flex; align-items:center;">
-                                            <a href="javascript:void(0)" onclick="removeEntryRow(this)" style="color:#ccc; margin-right:5px; text-decoration:none; font-size:16px;">✕</a>
-                                            <input type="text" class="input-summary" placeholder="摘要" style="width: 90%;">
-                                        </div>
-                                    </td>
-                                    <td><input type="text" class="input-account" placeholder="科目代码" style="width: 95%;"></td>
-                                    <td><input type="number" class="input-debit" oninput="calculateTotals()" placeholder="0.00" style="width: 95%; text-align: right;"></td>
-                                    <td><input type="number" class="input-credit" oninput="calculateTotals()" placeholder="0.00" style="width: 95%; text-align: right;"></td>
-                                </tr>
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colspan="4" style="padding: 5px;">
-                                        <button onclick="addEntryRow()" style="width:100%; padding: 8px; border: 1px dashed #aaa; background: #fff; cursor: pointer; color: #555;">+ 添加分录行</button>
-                                    </td>
-                                </tr>
-                                <tr style="font-weight: bold; background-color: #eee;">
-                                    <td colspan="2" style="text-align: right; padding-right: 20px;">合 计：</td>
-                                    <td style="text-align: right; font-size: 16px; color: #27ae60;" id="total-debit-display">0.00</td>
-                                    <td style="text-align: right; font-size: 16px; color: #27ae60;" id="total-credit-display">0.00</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                        
-                        <div style="margin-top: 15px; text-align: right;">
-                            <button class="btn-primary" style="background-color: #f39c12;" onclick="saveVoucher('草稿')">保存草稿</button>
-                            <button class="btn-primary" style="background-color: #3498db;" onclick="saveVoucher('待审核')">提交审核</button>
-                        </div>
-                    </div>
-                    <h3>我的凭证列表 (制单)</h3>
-                    <table class="data-table">
+                    <table style="width:100%; border-collapse:collapse; border:1px solid #333; font-size:13px;">
                         <thead>
-                            <tr>
-                                <th>凭证号</th>
-                                <th>日期</th>
-                                <th style="text-align: right; padding-right: 20px;">金额 (RMB)</th>
-                                <th>制单人</th>
-                                <th>状态</th>
-                                <th>操作</th>
+                            <tr style="background:#eee;">
+                                <th style="border:1px solid #333; padding:5px;">摘要</th>
+                                <th style="border:1px solid #333; padding:5px;">会计科目</th>
+                                <th style="border:1px solid #333; padding:5px; width:80px;">借方</th>
+                                <th style="border:1px solid #333; padding:5px; width:80px;">贷方</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            ${voucherRows}
-                            <tr>
-                                <td>记2025110005</td>
-                                <td>2025-11-20</td>
-                                <td style="text-align: right; font-family:'Courier New'; font-weight:bold;">15,000.00</td>
-                                <td>李四</td>
-                                <td><span style="color: #c0392b; font-weight: bold;">已驳回</span></td>
-                                <td>
-                                    <a href="#" onclick="alert('加载模拟数据...')" style="color:#3498db;">编辑</a> | 
-                                    <a href="#" style="color:#e74c3c;">删除</a>
-                                </td>
-                            </tr>
+                        <tbody id="preview-tbody">
+                            <tr><td colspan="4" style="text-align:center; padding:20px; color:#ccc;">等待录入数据...</td></tr>
                         </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2" style="border:1px solid #333; text-align:center; font-weight:bold;">合 计</td>
+                                <td id="preview-total-debit" style="border:1px solid #333; text-align:right; font-weight:bold;">0.00</td>
+                                <td id="preview-total-credit" style="border:1px solid #333; text-align:right; font-weight:bold;">0.00</td>
+                            </tr>
+                        </tfoot>
                     </table>
-                `;
+                </div>
+                
+                <div style="margin-top:15px; font-size:12px; color:#888; line-height:1.5;">
+                    💡 <strong>系统提示：</strong><br>
+                    1. 凭证类型已根据【结算账户】自动判断。<br>
+                    2. 摘要已根据【业务场景 + 往来单位】自动拼接。<br>
+                    3. 借贷方向已自动平衡。
+                </div>
+            </div>
+        </div>
+
+        <h3 style="margin-top:30px;">最近录入记录</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>凭证号</th><th>日期</th><th style="text-align: right;">金额</th><th>制单人</th><th>状态</th><th>操作</th>
+                </tr>
+            </thead>
+            <tbody>${voucherRows}</tbody>
+        </table>
+    `;
+
+    // 初始化预览
+    setTimeout(window.updateSmartPreview, 100);
   }
 
   // =========================================================================
@@ -5270,7 +5263,28 @@ function loadContent(moduleCode, element = null) {
     const y = dateObj.getFullYear();
     const m = String(dateObj.getMonth() + 1).padStart(2, "0");
     const d = String(dateObj.getDate()).padStart(2, "0");
+// ============================================================
+    // ★★★ 核心修复：根据凭证号首字判断大标题 ★★★
+    // ============================================================
+    let titleText = "记 账 凭 证"; // 默认兜底
+    let wordText = "记";         // 默认字号
 
+    // 获取凭证号的第一个字 (例如 "收2025..." -> "收")
+    const firstChar = v.id ? v.id.charAt(0) : "记";
+    
+    if (firstChar === '收') {
+        titleText = "收 款 凭 证";
+        wordText = "收";
+    } else if (firstChar === '付') {
+        titleText = "付 款 凭 证";
+        wordText = "付";
+    } else if (firstChar === '转') {
+        titleText = "转 账 凭 证";
+        wordText = "转";
+    }
+
+    // 凭证字 (右上角显示用)
+    const voucherWord = firstChar;
     // 样式保持不变
     const voucherStyle = `
                     <style>
@@ -5371,89 +5385,87 @@ function loadContent(moduleCode, element = null) {
                     `;
     }
 
-    contentHTML += `
-                    ${voucherStyle}
-                    
-                    <div style="margin-bottom:20px; display:flex; justify-content:space-between;">
-                        <button class="btn-primary" style="background-color: #95a5a6;" onclick="loadContent('VoucherQueryPrint')"> < 返回列表</button>
-                        <div>
-                            <button class="btn-primary" style="background-color: #3498db;" onclick="window.print()">🖨 打印凭证</button>
-                        </div>
-                    </div>
+ contentHTML += `
+        ${voucherStyle}
+        
+        <div style="margin-bottom:20px; display:flex; justify-content:space-between;">
+            <button class="btn-primary" style="background-color: #95a5a6;" onclick="loadContent('VoucherQueryPrint')"> < 返回列表</button>
+            <div>
+                <button class="btn-primary" style="background-color: #3498db;" onclick="window.print()">🖨 打印凭证</button>
+            </div>
+        </div>
 
-                    <div class="voucher-box">
-                        <div class="v-title-container">
-                            <div class="v-title">记 账 凭 证</div>
-                            <div style="position:absolute; right:10px; top:10px; font-size:14px;">记字第 ${v.id.replace(
-                              /\D/g,
-                              ""
-                            )} 号</div>
-                        </div>
+        <div class="voucher-box">
+            <div class="v-title-container">
+                <div class="v-title">${titleText}</div>
+                
+                <div style="position:absolute; right:10px; top:10px; font-size:14px;">${wordText}字第 ${v.id.replace(/\D/g, "")} 号</div>
+            </div>
 
-                        <div class="v-header-info">
-                            <div style="visibility:hidden;">占位</div>
-                            <div class="v-date-group">
-                                <span>${y}</span>年<span>${m}</span>月<span>${d}</span>日
+            <div class="v-header-info">
+                <div style="visibility:hidden;">占位</div>
+                <div class="v-date-group">
+                    <span>${y}</span>年<span>${m}</span>月<span>${d}</span>日
+                </div>
+                <div style="visibility:hidden;">占位</div>
+            </div>
+
+            <table class="v-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width: 22%;">摘 要</th>
+                        <th rowspan="2" style="width: 18%;">总账科目</th>
+                        <th rowspan="2" style="width: 15%;">明细科目</th>
+                        <th rowspan="2" style="width: 30px;">√</th>
+                        <th style="width: 20%;">借 方 金 额</th>
+                        <th style="width: 20%;">贷 方 金 额</th>
+                    </tr>
+                    <tr class="money-header-row">
+                        <th style="padding:0;">
+                            <div style="border:none;">
+                                <span>千</span><span>百</span><span>十</span><span>万</span><span>千</span><span>百</span><span>十</span><span>元</span><span>角</span><span>分</span>
                             </div>
-                            <div style="visibility:hidden;">占位</div>
-                        </div>
+                        </th>
+                        <th style="padding:0;">
+                            <div style="border:none;">
+                                <span>千</span><span>百</span><span>十</span><span>万</span><span>千</span><span>百</span><span>十</span><span>元</span><span>角</span><span>分</span>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${linesHTML}
+                    <tr style="${v.isRed ? "color:red;" : ""}">
+                        <td colspan="3" style="text-align: left; padding-left: 20px; font-weight: bold;">合　　计</td>
+                        <td></td>
+                        <td class="money-grid-bg">
+                            <span style="float:left; font-size:12px; margin-top:3px; margin-left:5px;">¥</span>
+                            ${totalDebitStr}
+                        </td>
+                        <td class="money-grid-bg">
+                            <span style="float:left; font-size:12px; margin-top:3px; margin-left:5px;">¥</span>
+                            ${totalCreditStr}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
 
-                        <table class="v-table">
-                            <thead>
-                                <tr>
-                                    <th rowspan="2" style="width: 22%;">摘 要</th>
-                                    <th rowspan="2" style="width: 18%;">总账科目</th>
-                                    <th rowspan="2" style="width: 15%;">明细科目</th>
-                                    <th rowspan="2" style="width: 30px;">√</th>
-                                    <th style="width: 20%;">借 方 金 额</th>
-                                    <th style="width: 20%;">贷 方 金 额</th>
-                                </tr>
-                                <tr class="money-header-row">
-                                    <th style="padding:0;">
-                                        <div style="border:none;">
-                                            <span>千</span><span>百</span><span>十</span><span>万</span><span>千</span><span>百</span><span>十</span><span>元</span><span>角</span><span>分</span>
-                                        </div>
-                                    </th>
-                                    <th style="padding:0;">
-                                        <div style="border:none;">
-                                            <span>千</span><span>百</span><span>十</span><span>万</span><span>千</span><span>百</span><span>十</span><span>元</span><span>角</span><span>分</span>
-                                        </div>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${linesHTML}
-                                <tr style="${v.isRed ? "color:red;" : ""}">
-                                    <td colspan="3" style="text-align: left; padding-left: 20px; font-weight: bold;">合　　计</td>
-                                    <td></td>
-                                    <td class="money-grid-bg">
-                                        <span style="float:left; font-size:12px; margin-top:3px; margin-left:5px;">¥</span>
-                                        ${totalDebitStr}
-                                    </td>
-                                    <td class="money-grid-bg">
-                                        <span style="float:left; font-size:12px; margin-top:3px; margin-left:5px;">¥</span>
-                                        ${totalCreditStr}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+            <div class="attachment-side">附<br>单<br>据<br><br><strong>1</strong><br><br>张</div>
 
-                        <div class="attachment-side">附<br>单<br>据<br><br><strong>1</strong><br><br>张</div>
+            <div class="v-footer">
+                <div>财务主管：<span>___________</span></div>
+                <div>记账：<span>${v.status === "已记账" ? "系统" : ""}</span></div>
+                <div>出纳：<span>___________</span></div>
+                <div>审核：<span>张三</span></div>
+                <div>制单：<span>${v.user || "系统引擎"}</span></div>
+            </div>
+        </div>
+    `;
 
-                        <div class="v-footer">
-                            <div>财务主管：<span>___________</span></div>
-                            <div>记账：<span>${
-                              v.status === "已记账" ? "系统" : ""
-                            }</span></div>
-                            <div>出纳：<span>___________</span></div>
-                            <div>审核：<span>张三</span></div>
-                            <div>制单：<span>${
-                              v.user || "系统引擎"
-                            }</span></div>
-                        </div>
-                    </div>
-                `;
-  }
+  
+  
+  
+              }
 
   // =========================================================================
   // 39. 科目汇总表 (AcctSubjectSummary) - [终极修复版：精准汇总]

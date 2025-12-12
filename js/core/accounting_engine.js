@@ -1,36 +1,70 @@
 // js/core/accounting_engine.js
 
+// js/core/accounting_engine.js
+
 // 1. 定义全局分录模板
+
 const GLOBAL_TEMPLATES = [
+    // ---------------------------------------------------------
+    // 场景 A：月结客户 (先对账确认收入)
+    // ---------------------------------------------------------
     {
-        id: 'TPL_REV_CONFIRM',
-        voucherWord: '记',
-        trigger: '对账单确认',
-        entries: [
-            { dir: '借', subject: '1122 应收账款', valType: 'total' }, 
-            { dir: '贷', subject: '6001 主营业务收入', valType: 'noTax' },
-            { dir: '贷', subject: '2221 应交税费-待转销项税额', valType: 'tax' }
-        ]
-    },
-    {
-        id: 'TPL_TAX_INVOICE',
+        id: 'TPL_MONTHLY_CONFIRM',
+        name: '月结收入确认',
         voucherWord: '转',
-        trigger: '发票开具',
-        entries: [
-            { dir: '借', subject: '2221 应交税费-待转销项税额', valType: 'tax' },
-            { dir: '贷', subject: '2221 应交税费-应交增值税(销项)', valType: 'tax' }
-        ]
-    },
-    {
-        id: 'TPL_AR_VERIFY',
-        voucherWord: '银',
-        trigger: '收款核销',
+        // 触发条件：对账单确认 (且不是预收冲抵)
+        trigger: '对账单确认', 
         entries: [
             { dir: '借', subject: '1002 银行存款', valType: 'total' },
             { dir: '贷', subject: '1122 应收账款', valType: 'total' }
-        ]
+        ],
+        status: '启用'
+    },
+    {
+        id: 'TPL_MONTHLY_RECEIPT',
+        name: '月结收款',
+        voucherWord: '收',
+        trigger: '收款核销',
+        entries: [
+            { dir: '借', subject: '1122 应收账款', valType: 'total' },
+            { dir: '贷', subject: '6001 主营业务收入', valType: 'noTax' },
+            { dir: '贷', subject: '2221 应交税费-应交增值税(销项)', valType: 'tax' }
+        ],
+        status: '启用'
+    },
+
+    // ---------------------------------------------------------
+    // 场景 B：现付/预付客户 (先收款，后确认收入)
+    // ---------------------------------------------------------
+    {
+        id: 'TPL_PREPAY_RECEIPT',
+        name: '现付/预收款',
+        voucherWord: '收',
+        // 触发条件：预收款单确认
+        trigger: '预收款确认', 
+        entries: [
+            { dir: '借', subject: '1002 银行存款', valType: 'total' },
+            { dir: '贷', subject: '2203 预收账款', valType: 'total' }
+        ],
+        status: '启用'
+    },
+    {
+        id: 'TPL_PREPAY_INVOICE',
+        name: '现付开票/冲预收',
+        voucherWord: '转',
+        // 触发条件：现付开票
+        trigger: '现付开票', 
+        entries: [
+            // ★★★ 纠正后的分录 ★★★
+            { dir: '借', subject: '2203 预收账款', valType: 'total' }, // 冲减预收
+            { dir: '贷', subject: '6001 主营业务收入', valType: 'noTax' },
+            { dir: '贷', subject: '2221 应交税费-应交增值税(销项)', valType: 'tax' }
+        ],
+        status: '启用'
     }
 ];
+
+
 
 // 2. 会计引擎执行函数
 window.runAccountingEngine = function(triggerName, context) {

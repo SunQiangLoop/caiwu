@@ -3,42 +3,6 @@
         // =========================================================================
         // ★★★ 会计引擎核心配置与执行器 ★★★
         // =========================================================================
-
-/*         // 1. 定义全局分录模板 
-        const GLOBAL_TEMPLATES = [
-            {
-                id: 'TPL_REV_CONFIRM',
-                voucherWord: '记',
-                trigger: '对账单确认',
-                entries: [
-                    { dir: '借', subject: '1122 应收账款', valType: 'total' }, // 价税合计
-                    { dir: '贷', subject: '6001 主营业务收入', valType: 'noTax' }, // 不含税
-                    { dir: '贷', subject: '2221 应交税费-待转销项税额', valType: 'tax' } // 税额
-                ]
-            },
-            {
-                id: 'TPL_TAX_INVOICE',
-                voucherWord: '转',
-                trigger: '发票开具',
-                entries: [
-                    { dir: '借', subject: '2221 应交税费-待转销项税额', valType: 'tax' },
-                    { dir: '贷', subject: '2221 应交税费-应交增值税(销项)', valType: 'tax' }
-                ]
-            },
-            {
-                id: 'TPL_AR_VERIFY',
-                voucherWord: '银',
-                trigger: '收款核销',
-                entries: [
-                    { dir: '借', subject: '1002 银行存款', valType: 'total' },
-                    { dir: '贷', subject: '1122 应收账款', valType: 'total' }
-                ]
-            }
-        ];
- */
-
-
-
         // 2. 会计引擎执行函数 (核心中的核心)
         function runAccountingEngine(triggerName, context) {
             // context = { client: '客户名', amount: '金额字符串' }
@@ -1785,3 +1749,26 @@
             loadContent('ARCollectionVerify');
         }
 
+// js/core/app.js
+
+// ... (其他代码)
+
+/** * 查看对账单明细 (跳转到详情页) 
+ * @param {string} reconId - 对账单号
+ */
+window.viewReconDetails = function (reconId) {
+    // 1. 找到对账单本身的信息 (用于显示表头)
+    const recons = JSON.parse(sessionStorage.getItem('CustomerRecons') || "[]");
+    let recon = recons.find(r => r.id === reconId);
+
+    if (!recon) {
+        // 兜底：如果是点到了演示数据，给个默认对象防止报错
+        recon = { id: reconId, client: '演示客户', amount: '0.00', period: '2025-11', status: '未知' };
+    }
+
+    // 2. 存入全局变量 (供 view_manager.js 读取)
+    window.g_currentRecon = recon;
+
+    // 3. 跳转到详情页
+    loadContent('ReconDetail');
+}

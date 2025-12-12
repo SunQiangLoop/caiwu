@@ -284,3 +284,186 @@
                 loadContent('VoucherQueryPrint'); // 刷新
             }
         }
+
+
+        // ==========================================================
+// ★★★ 智能凭证录入逻辑 (Smart Entry) ★★★
+// ==========================================================
+
+/**
+ * 核心：更新右侧预览 (响应式)
+ */
+window.updateSmartPreview = function() {
+    // 1. 获取左侧表单数据
+    const scenarioEl = document.getElementById('biz-scenario');
+    const summaryInput = document.getElementById('biz-summary').value.trim();
+    const amountVal = parseFloat(document.getElementById('biz-amount').value) || 0;
+    const accountEl = document.getElementById('settlement-account');
+
+    if (!scenarioEl || !accountEl) return;
+
+    // 2. 获取选中项的 dataset 属性
+    const selectedBiz = scenarioEl.options[scenarioEl.selectedIndex];
+    const selectedAcct = accountEl.options[accountEl.selectedIndex];
+
+    // 业务侧科目信息
+    const bizSubject = selectedBiz.getAttribute('data-subject'); // 例如 "6001 主营业务收入"
+    const bizDefaultDir = selectedBiz.getAttribute('data-dir');  // "debit" 或 "credit"
+
+    // 资金侧科目信息
+    const fundSubject = selectedAcct.getAttribute('data-subject'); // 例如 "100201 银行存款"
+    const fundType = selectedAcct.getAttribute('data-type');       // "money" 或 "transfer"
+
+    // 3. 生成动态摘要
+    // 逻辑：如果没填摘要，就用场景名；填了就拼接
+    const bizName = selectedBiz.text; 
+    const finalSummary = summaryInput ? `${bizName}-${summaryInput}` : bizName;
+
+    // 4. 判定凭证类型 (核心逻辑)
+    let voucherType = "转账凭证";
+    // 逻辑：如果是资金类科目
+    if (fundType === 'money') {
+        // 如果业务是“借”，那钱就是“贷”（付出去），所以是付款凭证
+        // 如果业务是“贷”，那钱就是“借”（收进来），所以是收款凭证
+        if (bizDefaultDir === 'credit') {
+            voucherType = "收款凭证"; // 业务在贷方(收入)，资金在借方(收钱)
+        } else {
+            voucherType = "付款凭证"; // 业务在借方(费用)，资金在贷方(付钱)
+        }
+    }
+
+    // 5. 构造分录行 (Lines)
+    let lines = [];
+    const amtStr = amountVal.toFixed(2);
+
+    if (bizDefaultDir === 'credit') {
+        // 场景：收入 (贷方) -> 资金在借方
+        lines.push({ summary: finalSummary, account: fundSubject, debit: amtStr, credit: '' });
+        lines.push({ summary: finalSummary, account: bizSubject, debit: '', credit: amtStr });
+    } else {
+        // 场景：费用 (借方) -> 资金在贷方
+        lines.push({ summary: finalSummary, account: bizSubject, debit: amtStr, credit: '' });
+        lines.push({ summary: finalSummary, account: fundSubject, debit: '', credit: amtStr });
+    }
+
+    // 6. 渲染右侧预览 HTML
+    const tbody = document.getElementById('preview-tbody');
+    const tag = document.getElementById('preview-tag');
+    const totalD = document.getElementById('preview-total-debit');
+    const totalC = document.getElementById('preview-total-credit');
+
+  // ... (接 updateSmartPreview 函数内部)
+
+    // 7. ★★★ 修改建议：默认值改为 '转'，实现标准的三分法 ★★★
+    
+    let prefixWord = '转'; // ❌ 不要用 '记'，直接默认为 '转'
+    
+    // 根据类型覆盖字号
+    if (voucherType === '收款凭证') {
+        prefixWord = '收';
+    } else if (voucherType === '付款凭证') {
+        prefixWord = '付';
+    } 
+    // else { prefixWord 保持为 '转' }
+
+    const idEl = document.getElementById('current-v-id');
+    if (idEl) {
+        // 获取当前显示的单号数字部分
+        const currentText = idEl.innerText; 
+        // 这里的正则要稍微改一下，以防之前显示的是“记”
+        // 逻辑：不管之前是啥字，只取后面的数字
+        const numberPart = currentText.replace(/^[\u4e00-\u9fa5]/, ''); 
+        
+        // 拼接新单号
+        idEl.innerText = prefixWord + numberPart;
+    }
+
+    // 更新暂存数据
+    window._tempSmartVoucher = {
+        amount: amtStr,
+        lines: lines,
+        type: voucherType,
+        word: prefixWord
+    };
+
+
+    // 更新标签颜色和文字
+    tag.innerText = voucherType;
+    if (voucherType === '收款凭证') tag.style.background = '#e67e22'; // 橙色
+    else if (voucherType === '付款凭证') tag.style.background = '#2980b9'; // 蓝色
+    else tag.style.background = '#7f8c8d'; // 灰色
+
+    // 更新表格行
+    let rowsHtml = '';
+    lines.forEach(line => {
+        rowsHtml += `
+            <tr>
+                <td style="border:1px solid #eee; padding:5px;">${line.summary}</td>
+                <td style="border:1px solid #eee; padding:5px;">${line.account}</td>
+                <td style="border:1px solid #eee; padding:5px; text-align:right;">${line.debit}</td>
+                <td style="border:1px solid #eee; padding:5px; text-align:right;">${line.credit}</td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = rowsHtml;
+
+    // 更新合计
+    totalD.innerText = amtStr;
+    totalC.innerText = amtStr;
+
+    // 暂存当前计算结果供保存使用
+    window._tempSmartVoucher = {
+        amount: amtStr,
+        lines: lines,
+        type: voucherType
+    };
+}
+
+/**
+ * 保存智能凭证
+ */
+window.saveSmartVoucher = function() {
+    const data = window._tempSmartVoucher;
+    
+    // 校验
+    if (!data || parseFloat(data.amount) <= 0) {
+        alert("❌ 请输入有效的金额！");
+        return;
+    }
+
+    const vId = document.getElementById('current-v-id').innerText;
+    const vDate = new Date().toISOString().split('T')[0];
+
+    const newVoucher = {
+        id: vId,
+        date: vDate,
+        amount: data.amount,
+        user: '当前用户',
+        status: '已审核', // 智能录入通常直接生效，或设为“待审核”
+        type: data.type,  // 保存自动推导的类型
+        lines: data.lines
+    };
+
+    // 保存到 Session
+    let list = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
+    list.unshift(newVoucher);
+    sessionStorage.setItem('ManualVouchers', JSON.stringify(list));
+
+    // 记日志
+    if (typeof addAuditLog === 'function') {
+        addAuditLog({
+            level: '低风险', time: new Date().toLocaleString(), user: '当前用户', 
+            module: '智能凭证', action: '新增凭证', detail: `${vId} (${data.type})`
+        });
+    }
+
+    alert(`✅ 凭证保存成功！\n\n凭证号：${vId}\n类型：${data.type}`);
+    loadContent('VoucherEntryReview'); // 刷新页面重置
+}
+
+/**
+ * 重置表单
+ */
+window.resetSmartForm = function() {
+    loadContent('VoucherEntryReview');
+}
