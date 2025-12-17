@@ -5191,7 +5191,7 @@ function loadContent(moduleCode, element = null) {
                             ${dynamicRows}
                             <tr>
                                 <td><input type="checkbox"></td>
-                                <td class="val-id">记2025111808</td>
+                                <td class="val-id">转2025111808</td>
                                 <td class="val-date">2025-11-20</td>
                                 <td class="val-summary">手动录入凭证</td>
                                 <td class="val-debit">600.00</td>
@@ -5204,7 +5204,7 @@ function loadContent(moduleCode, element = null) {
                             </tr>
                             <tr id="row-记2025110001">
                                 <td><input type="checkbox" disabled></td>
-                                <td class="val-id">记2025110001</td>
+                                <td class="val-id">转2025110001</td>
                                 <td class="val-date">2025-11-20</td>
                                 <td class="val-summary">支付办公用品款</td>
                                 <td class="val-debit">500.00</td>

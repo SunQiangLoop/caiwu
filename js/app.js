@@ -1691,63 +1691,48 @@
             loadContent('ARCollectionVerify');
         }
 
+/**
+ * [修复版] 执行收款核销 (去除重复生成凭证)
+ */
+window.executeVerify = function (arId, amountStr, client) {
+    // 1. 模拟输入实收金额
+    const inputAmount = prompt(`正在核销单据【${arId}】\n\n应收金额：${amountStr}\n请输入本次实收金额：`, amountStr);
+    if (!inputAmount) return;
 
-        /** * [终极闭环] 执行收款核销 
-         * 1. 更新应收账款状态 -> 已核销
-         * 2. 自动生成收款凭证
-         */
-        window.executeVerify = function (arId, amountStr, client) {
-            // 1. 模拟输入实收金额 (默认全额)
-            const inputAmount = prompt(`正在核销单据【${arId}】\n\n应收金额：${amountStr}\n请输入本次实收金额：`, amountStr);
-            if (!inputAmount) return;
+    // 2. 更新应收列表状态
+    let arList = JSON.parse(sessionStorage.getItem('ARStatements') || "[]");
+    let item = arList.find(i => i.id === arId);
 
-            // 2. 更新应收列表状态
-            let arList = JSON.parse(sessionStorage.getItem('ARStatements') || "[]");
-            let item = arList.find(i => i.id === arId);
+    if (item) {
+        item.status = '已核销';
+        item.verified = inputAmount;
+        item.unverified = '0.00';
+        sessionStorage.setItem('ARStatements', JSON.stringify(arList));
 
-            if (item) {
-                item.status = '已核销';
-                item.verified = inputAmount;
-                item.unverified = '0.00';
-                sessionStorage.setItem('ARStatements', JSON.stringify(arList));
+        // ============================================================
+        // ★★★ 核心修复：只保留这一行引擎调用，删除下面的手动代码 ★★★
+        // ============================================================
+        
+        // 1. 调用引擎生成标准凭证 (这是你要保留的红框凭证)
+        // 摘要会自动生成为：收款核销 - 客户名
+        const vId = runAccountingEngine('收款核销', { client: client, amount: inputAmount });
 
+        // ▼▼▼▼▼▼▼▼▼▼▼ 下面这段重复的代码已经被删除了 ▼▼▼▼▼▼▼▼▼▼▼
+        /* const vId2 = "收" + ...; 
+        const newVoucher = { ... summary: `收 ${client} 运费/对账款` ... }; 
+        list.unshift(newVoucher);
+        */
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-                // ★★★ 修改：调用会计引擎生成凭证 (替代原来的手写逻辑) ★★★
-                const vId = runAccountingEngine('收款核销', { client: client, amount: inputAmount });
+        // 3. 清理选中状态并刷新
+        sessionStorage.removeItem('TargetVerifyBill');
 
-                // 移除 TargetVerifyBill ... 
-
-                alert(`🎉 核销成功！\n自动生成收款凭证：${vId}`);
-                loadContent('ARCollectionVerify');
-            }
-
-            // 3. ★★★ 自动生成收款凭证 (Auto Voucher) ★★★
-            const vId = "收" + new Date().getFullYear() + Math.floor(Math.random() * 10000);
-            const newVoucher = {
-                id: vId,
-                date: new Date().toISOString().split('T')[0],
-                amount: inputAmount,
-                user: '系统自动',
-                status: '已记账', // 核销生成的凭证直接记账
-                lines: [
-                    { summary: `收 ${client} 运费/对账款`, account: '1002 银行存款', debit: inputAmount, credit: '' },
-                    { summary: `核销 ${arId}`, account: '1122 应收账款', debit: '', credit: inputAmount }
-                ]
-            };
-
-            // 存入凭证库
-            let vList = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
-            vList.unshift(newVoucher);
-            sessionStorage.setItem('ManualVouchers', JSON.stringify(vList));
-
-            // 4. 清理选中状态并刷新
-            sessionStorage.removeItem('TargetVerifyBill');
-
-            // 5. 成功提示
-            alert(`🎉 核销成功！\n\n1. 应收账款已结清。\n2. 已自动生成收款凭证【${vId}】。\n3. 资金已进入银行存款科目。`);
-
-            loadContent('ARCollectionVerify');
-        }
+        alert(`🎉 核销成功！\n\n1. 应收账款已更新。\n2. 已自动生成凭证：${vId}`);
+        loadContent('ARCollectionVerify');
+    } else {
+        alert("❌ 未找到该单据信息！");
+    }
+}
 
 // js/core/app.js
 
