@@ -20,7 +20,7 @@ function getModuleName(code) {
     APPaymentApply: "供应商付款申请",
     APPrepayment: "预付款单",
     APPaymentVerify: "付款核销",
-    APInvoiceManage: "供应商发票管理",
+    APInvoiceManage: "进项发票台账",
     FundCustomerAcct: "客户资金账户",
     FundEnergyAcct: "能源账户管理",
     FundWallet: "司机/网点钱包",
@@ -72,7 +72,8 @@ function getModuleName(code) {
     BankBalanceQuery: "银行余额实时查询",
     BasicSetup: "基础设置",
     Permission: "权限管理",
-    SystemLog: "系统日志/审计",
+    DriverProfileDetail: "司机档案详情",
+   
   };
   return names[code] || "未知模块";
 }
@@ -220,7 +221,7 @@ function loadContent(moduleCode, element = null) {
     contentHTML += `
                     ${flowStyle}
                     
-                    <h2>财务工作台 (Workbench)</h2>
+                    <h2>财务工作台 </h2>
                     <p style="color: #7f8c8d; margin-bottom: 15px;">标准财务作业流程导航，点击图标快速进入功能模块。</p>
                     
                     ${flowHtml}
@@ -685,6 +686,186 @@ function loadContent(moduleCode, element = null) {
                         <tbody>${rows}</tbody>
                     </table>
                 `;
+  }
+
+// =========================================================================
+  //  网点对账 (ReconSite) - [增强版：含催办/明细/调整/自动结算方向]
+  // =========================================================================
+  else if (moduleCode === "ReconSite") {
+    // 1. 初始化数据 (带缓存，模拟真实业务场景)
+    let siteRecons = JSON.parse(sessionStorage.getItem('SiteRecons'));
+    if (!siteRecons || siteRecons.length === 0) {
+      siteRecons = [
+        {
+          id: "WD202511-001",
+          name: "上海浦东金桥分部",
+          type: "直营",
+          period: "2025-11",
+          ar: 50000.00,  // 面单费、中转费 (公司收网点)
+          ap: 12000.00,  // 派送费 (公司付网点)
+          // 净额 +38,000 (网点欠公司 -> 转应收)
+          status: "待网点确认",
+          diff: "无差异"
+        },
+        {
+          id: "WD202511-002",
+          name: "杭州余杭加盟点",
+          type: "加盟",
+          period: "2025-11",
+          ar: 15000.00,
+          ap: 48000.00,
+          // 净额 -33,000 (公司欠网点 -> 转应付)
+          status: "待网点确认",
+          diff: "有异议"
+        },
+        {
+          id: "WD202511-003",
+          name: "苏州工业园区网点",
+          type: "加盟",
+          period: "2025-11",
+          ar: 20000.00,
+          ap: 22500.00,
+          // 净额 -2,500
+          status: "已确认",
+          diff: "已调整"
+        }
+      ];
+      sessionStorage.setItem('SiteRecons', JSON.stringify(siteRecons));
+    }
+
+    // 2. 渲染表格行
+    const rows = siteRecons.map(r => {
+        // 计算净额：应收(AR) - 应付(AP)
+        const netAmount = r.ar - r.ap;
+        
+        // 样式逻辑
+        let netStyle = "";
+        let netText = "";
+        if (netAmount > 0) {
+            netStyle = "color:#27ae60; font-weight:bold;"; // 绿色：网点要给钱
+            netText = `+${netAmount.toLocaleString()}`;
+        } else if (netAmount < 0) {
+            netStyle = "color:#e74c3c; font-weight:bold;"; // 红色：公司要付钱
+            netText = netAmount.toLocaleString();
+        } else {
+            netText = "0.00";
+        }
+
+        // 操作按钮逻辑 (核心交互)
+        let actions = "";
+        
+        if (r.status === '待网点确认') {
+            // 场景：网点还没确认 -> 催办 + 调整
+            actions = `
+                <a href="javascript:void(0)" onclick="urgeSite('${r.id}')" style="color:#e67e22;">🔔 催办</a>
+                <span style="color:#eee">|</span>
+                <a href="javascript:void(0)" onclick="adjustSiteRecon('${r.id}')" style="color:#3498db;">✎ 调整</a>
+            `;
+        } else if (r.status === '已确认') {
+            // 场景：已确认 -> 根据正负值决定生成什么单据
+            if (netAmount < 0) {
+                // 公司欠网点 -> 生成应付
+                actions = `<button class="btn-primary" style="background:#e74c3c; padding:2px 8px; font-size:12px;" onclick="generateSiteAP('${r.id}', '${Math.abs(netAmount)}')">💸 转应付单</button>`;
+            } else {
+                // 网点欠公司 -> 生成应收
+                actions = `<button class="btn-primary" style="background:#27ae60; padding:2px 8px; font-size:12px;" onclick="generateSiteAR('${r.id}', '${netAmount}')">💰 转应收单</button>`;
+            }
+        } else {
+            actions = `<span style="color:#999">已完成</span>`;
+        }
+
+        return `
+            <tr>
+                <td><a href="javascript:void(0)" onclick="viewSiteDetail('${r.id}')" style="font-weight:bold; text-decoration:underline; color:#333;">${r.id}</a></td>
+                <td>${r.name}<br><span style="font-size:12px; color:#999;">${r.type}</span></td>
+                <td>${r.period}</td>
+                <td style="text-align:right;">${r.ar.toLocaleString()}</td>
+                <td style="text-align:right;">${r.ap.toLocaleString()}</td>
+                <td style="text-align:right; background:#f9f9f9; ${netStyle}">${netText}</td>
+                <td>
+                    <span style="${r.status==='待网点确认'?'color:#f39c12':'color:#2980b9'}">${r.status}</span>
+                </td>
+                <td>${actions}</td>
+            </tr>
+        `;
+    }).join('');
+
+    contentHTML += `
+        <h2>网点对账 </h2>
+        <p style="color: #7f8c8d;">
+            全网网点资金结算中心。系统自动执行 <b>应收(面单/中转)</b> 与 <b>应付(派送/补贴)</b> 的轧差计算。
+        </p>
+        
+        <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="display:flex; gap:15px; flex-wrap:wrap;">
+                <input type="month" value="2025-11" style="padding:8px; border:1px solid #ccc;">
+                <input type="text" placeholder="网点名称/编号" style="padding:8px; border:1px solid #ccc; width:200px;">
+                <select style="padding:8px; border:1px solid #ccc;">
+                    <option>全部状态</option>
+                    <option>待网点确认</option>
+                    <option>已确认</option>
+                </select>
+                <button class="btn-primary">查询</button>
+                <button class="btn-primary" style="background-color:#f39c12; margin-left:auto;" onclick="alert('已向 12 家未确认网点发送站内信和短信提醒！')">🔥 一键催办</button>
+            </div>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>对账单号</th>
+                    <th>网点信息</th>
+                    <th>账期</th>
+                    <th style="text-align:right;">本方应收 (RMB)<br><span style="font-size:10px; font-weight:normal;">(面单/罚款)</span></th>
+                    <th style="text-align:right;">本方应付 (RMB)<br><span style="font-size:10px; font-weight:normal;">(派送费/奖励)</span></th>
+                    <th style="text-align:right;">结算净额 (RMB)<br><span style="font-size:10px; font-weight:normal;">(应收 - 应付)</span></th>
+                    <th>状态</th>
+                    <th style="width:180px;">操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+  }
+  
+  // =========================================================================
+  // 2.1 网点对账明细 (ReconSiteDetail) - [查看明细页面]
+  // =========================================================================
+  else if (moduleCode === "ReconSiteDetail") {
+      const id = window.g_currentSiteId || "未知单号";
+      contentHTML += `
+        <div style="margin-bottom:15px;">
+            <button class="btn-primary" style="background:#95a5a6; padding:5px 15px;" onclick="loadContent('ReconSite')"> < 返回列表</button>
+            <h2 style="display:inline-block; margin-left:15px; vertical-align:middle;">对账详情：<span style="color:#2980b9;">${id}</span></h2>
+        </div>
+        
+        <div style="display:flex; gap:20px;">
+            <div style="flex:1; background:white; padding:15px; border-top:3px solid #27ae60;">
+                <h3 style="color:#27ae60; margin-top:0;">📥 本方应收明细 (Income)</h3>
+                <table class="data-table">
+                    <thead><tr><th>费用类型</th><th>单量</th><th>金额</th></tr></thead>
+                    <tbody>
+                        <tr><td>电子面单费</td><td>5,000票</td><td style="text-align:right;">15,000.00</td></tr>
+                        <tr><td>中转费</td><td>5,000票</td><td style="text-align:right;">5,000.00</td></tr>
+                        <tr><td>遗失罚款</td><td>1票</td><td style="text-align:right;">200.00</td></tr>
+                        <tr style="font-weight:bold; background:#f0f9f0;"><td>小计</td><td>-</td><td style="text-align:right;">20,200.00</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="flex:1; background:white; padding:15px; border-top:3px solid #e74c3c;">
+                <h3 style="color:#e74c3c; margin-top:0;">📤 本方应付明细 (Expense)</h3>
+                <table class="data-table">
+                    <thead><tr><th>费用类型</th><th>单量</th><th>金额</th></tr></thead>
+                    <tbody>
+                        <tr><td>派送费</td><td>12,000票</td><td style="text-align:right;">24,000.00</td></tr>
+                        <tr><td>操作补贴</td><td>-</td><td style="text-align:right;">500.00</td></tr>
+                        <tr style="font-weight:bold; background:#fff0f0;"><td>小计</td><td>-</td><td style="text-align:right;">24,500.00</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      `;
   }
 
 
@@ -1501,70 +1682,187 @@ function loadContent(moduleCode, element = null) {
                 `;
   }
 
-  // =========================================================================
-  // 11. 供应商发票管理 (AP Invoice Manage)
+// =========================================================================
+  // 18. 供应商发票管理/进项台账 (APInvoiceManage) - [核心：OCR与认证抵扣]
   // =========================================================================
   else if (moduleCode === "APInvoiceManage") {
-    contentHTML += `
-                    <h2>供应商发票管理</h2>
-                    <p style="color: #7f8c8d;">记录和管理收到的供应商（进项）发票信息，作为应付账款和税务核算的依据。</p>
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <input type="text" placeholder="发票号码 / 供应商名称" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
-                            <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="">认证状态 (全部)</option>
-                                <option>待认证</option>
-                                <option>已认证</option>
-                            </select>
-                            <input type="date" placeholder="开票日期范围" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
-                            <button class="btn-primary">查询</button>
-                        </div>
-                    </div>
-                    
-                    <div class="action-bar" style="margin-bottom: 15px;">
-                        <button class="btn-primary" style="background-color: #27ae60;">+ 登记新发票</button>
-                        <button class="btn-primary" style="background-color: #3498db;">批量认证</button>
-                    </div>
+    // 1. 初始化模拟数据 (模拟从税务局底账库同步的数据)
+    let inputInvoices = JSON.parse(sessionStorage.getItem('InputInvoices'));
+    if (!inputInvoices || inputInvoices.length === 0) {
+      inputInvoices = [
+        {
+          id: "INV-IN-20251101",
+          code: "3100193130",
+          number: "18902233",
+          supplier: "中国石化销售有限公司",
+          type: "专票",
+          rate: "13%",
+          amount: 5000.00, // 不含税
+          tax: 650.00,     // 税额
+          total: 5650.00,  // 价税合计
+          date: "2025-11-01",
+          status: "未认证", // 状态流：未认证 -> 已认证 -> 已抵扣
+          risk: "正常"
+        },
+        {
+          id: "INV-IN-20251102",
+          code: "1100192240",
+          number: "22093344",
+          supplier: "顺丰速运有限公司",
+          type: "专票",
+          rate: "9%",
+          amount: 2000.00,
+          tax: 180.00,
+          total: 2180.00,
+          date: "2025-11-05",
+          status: "已认证",
+          risk: "正常"
+        },
+        {
+          id: "INV-IN-20251103",
+          code: "4400183320",
+          number: "88990011",
+          supplier: "某不知名耗材店",
+          type: "普票",
+          rate: "1%",
+          amount: 300.00,
+          tax: 3.00,
+          total: 303.00,
+          date: "2025-11-10",
+          status: "无需认证", // 普票不能抵扣
+          risk: "重复报销疑点" // 风控标识
+        }
+      ];
+      sessionStorage.setItem('InputInvoices', JSON.stringify(inputInvoices));
+    }
 
-                    <h3>发票台账</h3>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>发票号码</th>
-                                <th>供应商名称</th>
-                                <th>金额 (RMB)</th>
-                                <th>税额 (RMB)</th>
-                                <th>价税合计 (RMB)</th>
-                                <th>开票日期</th>
-                                <th>认证状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>1300055210</td>
-                                <td>华北燃油</td>
-                                <td>9,090.91</td>
-                                <td>909.09</td>
-                                <td>10,000.00</td>
-                                <td>2025-11-15</td>
-                                <td><span style="color: #f39c12;">待认证</span></td>
-                                <td><a href="#" style="color:#3498db;">查看/认证</a></td>
-                            </tr>
-                            <tr>
-                                <td>1300055211</td>
-                                <td>某设备租赁</td>
-                                <td>4,716.98</td>
-                                <td>283.02</td>
-                                <td>5,000.00</td>
-                                <td>2025-11-10</td>
-                                <td><span style="color: #27ae60;">已认证</span></td>
-                                <td><a href="#" style="color:#3498db;">查看</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-  } // =========================================================================
+    // 2. 渲染列表
+    const rows = inputInvoices.map(inv => {
+        // 状态徽标颜色
+        let statusBadge = "";
+        if (inv.status === '已认证') statusBadge = `<span class="badge badge-success">✔ 已认证</span>`;
+        else if (inv.status === '未认证') statusBadge = `<span class="badge badge-warning" style="cursor:pointer;" onclick="verifyInvoice('${inv.id}')">⏳ 点击认证</span>`;
+        else statusBadge = `<span class="badge" style="background:#eee; color:#999;">${inv.status}</span>`;
+
+        // 风险提示
+        let riskTag = "";
+        if (inv.risk !== '正常') {
+            riskTag = `<span style="color:#e74c3c; font-size:12px;">⚠️ ${inv.risk}</span>`;
+        } else {
+            riskTag = `<span style="color:#27ae60; font-size:12px;">🛡️ 验真通过</span>`;
+        }
+
+        // 按钮交互
+        const actionBtn = inv.status === '未认证' 
+            ? `<button class="btn-primary" style="padding:2px 8px; font-size:12px;" onclick="verifyInvoice('${inv.id}')">联网查验</button>`
+            : `<button class="btn-primary" style="background:#fff; color:#333; border:1px solid #ccc; padding:2px 8px; font-size:12px;" onclick="viewInvoiceImg('${inv.number}')">查看影像</button>`;
+
+        return `
+            <tr>
+                <td>
+                    <div style="font-weight:bold; color:#3498db;">${inv.number}</div>
+                    <div style="font-size:12px; color:#999;">代码: ${inv.code}</div>
+                </td>
+                <td>
+                    <div style="font-weight:bold;">${inv.supplier}</div>
+                    <div style="font-size:12px;">${inv.date} | ${inv.type}</div>
+                </td>
+                <td style="text-align:right;">${inv.amount.toLocaleString()}</td>
+                <td style="text-align:right; color:#27ae60;">${inv.tax.toLocaleString()}</td>
+                <td style="text-align:right; font-weight:bold;">${inv.total.toLocaleString()}</td>
+                <td>${statusBadge}<br>${riskTag}</td>
+                <td>${actionBtn}</td>
+            </tr>
+        `;
+    }).join('');
+
+    contentHTML += `
+        <h2>进项发票台账  🧾</h2>
+        <p style="color: #7f8c8d;">
+            全员报销与供应商结算的发票归集中心。支持 <b>OCR智能识票</b>、<b>国税联网验真</b> 及 <b>进项税额抵扣</b> 统计。
+        </p>
+
+        <div class="dashboard-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:20px;">
+            <div class="kpi-card" style="border-left: 4px solid #3498db;">
+                <div class="kpi-title">📅 本月认证税额 (抵扣)</div>
+                <div class="kpi-value" style="color:#3498db;">830.00</div>
+                <div class="kpi-trend">预计节省税金</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #f39c12;">
+                <div class="kpi-title">⏳ 待认证发票</div>
+                <div class="kpi-value" style="color:#f39c12;">1 张</div>
+                <div class="kpi-trend">涉及税额 650.00</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #27ae60;">
+                <div class="kpi-title">📥 票夹总张数</div>
+                <div class="kpi-value">142</div>
+                <div class="kpi-trend">电子票占比 85%</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #e74c3c;">
+                <div class="kpi-title">⚠️ 风险/红字发票</div>
+                <div class="kpi-value" style="color:#e74c3c;">2</div>
+                <div class="kpi-trend">重复报销拦截</div>
+            </div>
+        </div>
+
+        <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; gap:10px;">
+                    <input type="text" placeholder="发票号码/代码" style="padding:8px; border:1px solid #ccc; width:150px;">
+                    <input type="text" placeholder="销方名称" style="padding:8px; border:1px solid #ccc; width:150px;">
+                    <select style="padding:8px; border:1px solid #ccc;">
+                        <option>全部状态</option>
+                        <option>未认证</option>
+                        <option>已认证</option>
+                        <option>异常/作废</option>
+                    </select>
+                    <button class="btn-primary">🔍 查询</button>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-primary" style="background:#8e44ad;" onclick="simulateOCR()">📸 OCR 拍照识票</button>
+                    <button class="btn-primary" style="background:#27ae60;">📥 批量导入 (OFD/PDF)</button>
+                    <button class="btn-primary" style="background:#fff; color:#333; border:1px solid #ccc;">导出台账</button>
+                </div>
+            </div>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>发票号码/代码</th>
+                    <th>销方信息</th>
+                    <th style="text-align:right;">金额 (不含税)</th>
+                    <th style="text-align:right;">税额 (抵扣额)</th>
+                    <th style="text-align:right;">价税合计</th>
+                    <th>验真/认证状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+
+        <div id="ocr-upload-zone" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999;">
+            <div style="background:white; width:500px; margin:100px auto; padding:30px; border-radius:8px; text-align:center;">
+                <h3>📸 智能票据识别</h3>
+                <div style="border:2px dashed #ccc; padding:40px; margin:20px 0; background:#f9f9f9;">
+                    <p style="color:#999;">拖拽发票文件(PDF/JPG/OFD)到此处</p>
+                    <p>或</p>
+                    <button class="btn-primary">选择文件</button>
+                </div>
+                <div id="ocr-progress" style="display:none; margin-top:20px;">
+                    <p>正在连接国税底账库查验...</p>
+                    <div style="width:100%; height:10px; background:#eee; border-radius:5px; overflow:hidden;">
+                        <div style="width:60%; height:100%; background:#3498db;"></div>
+                    </div>
+                </div>
+                <button class="btn-primary" style="background:#999; margin-top:20px;" onclick="closeOCR()">取消</button>
+            </div>
+        </div>
+    `;
+  }
+  
+  
+  // =========================================================================
   // 1. 客户资金账户 (FundCustomerAcct)
   // =========================================================================
   else if (moduleCode === "FundCustomerAcct") {
@@ -2168,6 +2466,8 @@ function loadContent(moduleCode, element = null) {
                 `;
   }
 
+
+  
   // =========================================================================
   // 16. 酬金结算 (Expense Compensation)
   // =========================================================================
@@ -4837,6 +5137,323 @@ function loadContent(moduleCode, element = null) {
                     `;
   }
 
+
+  // =========================================================================
+  // 60. 司机档案管理 (DriverProfile) - [运力中心核心]
+  // =========================================================================
+  else if (moduleCode === "DriverProfile") {
+    // 1. 初始化模拟数据 (包含资质、车型、评级)
+    let drivers = JSON.parse(sessionStorage.getItem('DriverList'));
+    if (!drivers || drivers.length === 0) {
+      drivers = [
+        {
+          id: "DRV-2025001", name: "张伟", phone: "13811112222",
+          plate: "沪A·B8899", carType: "17.5米 | 厢式", 
+          license: "A2", certStatus: "正常", expiryDate: "2026-05-20",
+          bankCard: "建设银行 (尾号8899)", deposit: 5000.00,
+          score: 4.9, status: "启用", tags: ["金牌司机", "干线专跑"]
+        },
+        {
+          id: "DRV-2025002", name: "李强", phone: "13900009999",
+          plate: "苏E·X7788", carType: "9.6米 | 高栏", 
+          license: "B2", certStatus: "即将过期", expiryDate: "2025-12-01",
+          bankCard: "招商银行 (尾号1234)", deposit: 2000.00,
+          score: 4.5, status: "启用", tags: ["短途王"]
+        },
+        {
+          id: "DRV-2025003", name: "王建国", phone: "15066667777",
+          plate: "浙B·C5566", carType: "4.2米 | 厢式", 
+          license: "C1", certStatus: "已过期", expiryDate: "2024-11-01",
+          bankCard: "-", deposit: 0.00,
+          score: 3.2, status: "黑名单", tags: ["多次货损", "投诉多"]
+        }
+      ];
+      sessionStorage.setItem('DriverList', JSON.stringify(drivers));
+    }
+
+    // 2. 渲染列表
+    const rows = drivers.map(d => {
+        // 状态与资质样式
+        let statusStyle = d.status === '启用' ? 'color:#27ae60; background:#f0f9f0;' : 'color:#e74c3c; background:#fff0f0;';
+        
+        let certBadge = "";
+        if(d.certStatus === '正常') certBadge = `<span style="color:#27ae60">✔ 正常</span>`;
+        else if(d.certStatus === '即将过期') certBadge = `<span style="color:#f39c12; font-weight:bold;">⚠️ 30天内过期</span>`;
+        else certBadge = `<span style="color:#e74c3c; font-weight:bold;">🚫 已过期</span>`;
+
+        // 标签渲染
+        const tagHtml = d.tags.map(t => `<span style="font-size:10px; border:1px solid #ccc; padding:1px 4px; border-radius:3px; color:#666; margin-right:3px;">${t}</span>`).join('');
+
+        // 评分星星
+        const stars = "⭐".repeat(Math.floor(d.score));
+
+        return `
+            <tr>
+                <td>
+                    <div style="font-weight:bold; color:#2980b9; cursor:pointer;" onclick="viewDriverDetail('${d.id}')">${d.name}</div>
+                    <div style="font-size:12px; color:#666;">${d.phone}</div>
+                </td>
+                <td>
+                    <div style="font-weight:bold;">${d.plate}</div>
+                    <div style="font-size:12px; color:#999;">${d.carType}</div>
+                </td>
+                <td>
+                    <div>${d.license} 驾照</div>
+                    <div style="font-size:12px;">有效期至: ${d.expiryDate}</div>
+                </td>
+                <td>${certBadge}</td>
+                <td style="text-align:right;">
+                    <div>押金: <span style="font-weight:bold;">${d.deposit.toLocaleString()}</span></div>
+                    <div style="font-size:12px; color:#999;">${d.bankCard}</div>
+                </td>
+                <td>
+                    <div style="color:#f39c12;">${d.score} ${stars}</div>
+                    <div style="margin-top:2px;">${tagHtml}</div>
+                </td>
+                <td><span style="padding:2px 6px; border-radius:4px; font-size:12px; ${statusStyle}">${d.status}</span></td>
+                <td>
+                    <a href="javascript:void(0)" onclick="viewDriverDetail('${d.id}')" style="color:#3498db;">详情</a>
+                    <span style="color:#ddd">|</span>
+                    ${d.status === '黑名单' 
+                      ? `<a href="javascript:void(0)" onclick="toggleDriverStatus('${d.id}')" style="color:#27ae60;">解禁</a>`
+                      : `<a href="javascript:void(0)" onclick="toggleDriverStatus('${d.id}')" style="color:#e74c3c;">拉黑</a>`
+                    }
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    contentHTML += `
+        <h2>司机档案库  🚚</h2>
+        <p style="color: #7f8c8d;">全平台运力资源中心。管理司机 <b>身份资质</b>、<b>车辆信息</b>、<b>收款账户</b> 及 <b>信用评级</b>。</p>
+
+        <div class="dashboard-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:20px;">
+            <div class="kpi-card" style="border-top: 4px solid #3498db;">
+                <div class="kpi-title">👨‍✈️ 注册司机总数</div>
+                <div class="kpi-value">3,420</div>
+                <div class="kpi-trend">本月新增 +45</div>
+            </div>
+            <div class="kpi-card" style="border-top: 4px solid #27ae60;">
+                <div class="kpi-title">✅ 活跃/接单中</div>
+                <div class="kpi-value" style="color:#27ae60;">1,208</div>
+                <div class="kpi-trend">运力利用率 35%</div>
+            </div>
+            <div class="kpi-card" style="border-top: 4px solid #f39c12;">
+                <div class="kpi-title">⚠️ 证件临期/过期</div>
+                <div class="kpi-value" style="color:#f39c12;">12</div>
+                <div class="kpi-trend">需立即介入审核</div>
+            </div>
+            <div class="kpi-card" style="border-top: 4px solid #e74c3c;">
+                <div class="kpi-title">🚫 黑名单/冻结</div>
+                <div class="kpi-value" style="color:#e74c3c;">5</div>
+                <div class="kpi-trend">严重违规拦截</div>
+            </div>
+        </div>
+
+        <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px; display:flex; justify-content:space-between;">
+            <div style="display:flex; gap:10px;">
+                <input type="text" placeholder="姓名/手机号" style="padding:8px; border:1px solid #ccc; width:140px;">
+                <input type="text" placeholder="车牌号" style="padding:8px; border:1px solid #ccc; width:120px;">
+                <select style="padding:8px; border:1px solid #ccc;">
+                    <option>所有车型</option>
+                    <option>17.5米</option>
+                    <option>9.6米</option>
+                    <option>4.2米</option>
+                </select>
+                <select style="padding:8px; border:1px solid #ccc;">
+                    <option>所有状态</option>
+                    <option>正常</option>
+                    <option>临期预警</option>
+                    <option>黑名单</option>
+                </select>
+                <button class="btn-primary">查询</button>
+            </div>
+            <div>
+                
+                <button class="btn-primary" style="background:#27ae60;">+ 新增司机</button>
+            </div>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>司机信息</th>
+                    <th>主驾车辆</th>
+                    <th>资质/证件效期</th>
+                    <th>合规状态</th>
+                    <th style="text-align:right;">财务信息</th>
+                    <th>信用评分</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+  }
+
+  // =========================================================================
+  // 61. 司机详情页 (DriverProfileDetail) - [360度画像]
+  // =========================================================================
+  else if (moduleCode === "DriverProfileDetail") {
+      const driverId = window.g_currentDriverId || "DRV-2025001";
+      // 实际开发中根据ID从数据库取，这里模拟取第一条
+      const d = JSON.parse(sessionStorage.getItem('DriverList'))[0]; 
+
+      contentHTML += `
+        <div style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <button class="btn-primary" style="background:#95a5a6; padding:5px 15px;" onclick="loadContent('DriverProfile')"> < 返回列表</button>
+                <h2 style="display:inline-block; margin-left:15px; vertical-align:middle;">司机档案：<span style="color:#2980b9;">${d.name}</span> <span style="font-size:14px; color:#666; font-weight:normal;">(${d.phone})</span></h2>
+            </div>
+            <div>
+                 <button class="btn-primary" style="background:#e67e22;" onclick="alert('已发送更新证件通知短信')">🔔 催更证件</button>
+                 <button class="btn-primary">💾 保存修改</button>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:20px; align-items:flex-start;">
+            
+            <div style="width:250px; background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                <div style="width:100px; height:100px; background:#eee; border-radius:50%; margin:0 auto 15px; display:flex; align-items:center; justify-content:center; font-size:40px;">👨‍✈️</div>
+                <h3 style="margin:0;">${d.name}</h3>
+                <p style="color:#666; font-size:13px;">注册日期：2023-01-15</p>
+                <div style="margin:15px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; padding:15px 0;">
+                    <div style="font-size:24px; color:#f39c12; font-weight:bold;">${d.score}</div>
+                    <div style="font-size:12px; color:#999;">综合评分 (5.0满分)</div>
+                </div>
+                <div style="text-align:left; font-size:13px; line-height:2;">
+                    <div>累计接单：<span style="float:right; font-weight:bold;">1,203 单</span></div>
+                    <div>准点率：<span style="float:right; font-weight:bold; color:#27ae60;">98.5%</span></div>
+                    <div>货损率：<span style="float:right; font-weight:bold;">0.01%</span></div>
+                </div>
+            </div>
+
+            <div style="flex:1; background:white; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                
+                <div style="border-bottom:1px solid #eee; margin-bottom:20px; display:flex; gap:30px;">
+                    <div style="padding-bottom:10px; border-bottom:3px solid #3498db; color:#3498db; font-weight:bold; cursor:pointer;">基本信息</div>
+                    <div style="padding-bottom:10px; cursor:pointer; color:#666;">车辆绑定 (2)</div>
+                    <div style="padding-bottom:10px; cursor:pointer; color:#666;">收款账户</div>
+                    <div style="padding-bottom:10px; cursor:pointer; color:#666;">证件影像</div>
+                </div>
+
+                <h4 style="border-left:4px solid #3498db; padding-left:10px; margin-top:0;">👤 身份信息</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:20px; margin-bottom:20px;">
+                    <div><label style="color:#999; font-size:12px;">身份证号</label><div style="font-weight:bold;">32010219800101XXXX</div></div>
+                    <div><label style="color:#999; font-size:12px;">驾驶证档案号</label><div style="font-weight:bold;">123456789012</div></div>
+                    <div><label style="color:#999; font-size:12px;">准驾车型</label><div style="font-weight:bold;">${d.license} (包含C1/B2)</div></div>
+                    <div><label style="color:#999; font-size:12px;">初次领证日期</label><div>2010-05-20 (驾龄15年)</div></div>
+                    <div><label style="color:#999; font-size:12px;">从业资格证号</label><div>320000001122</div></div>
+                    <div><label style="color:#999; font-size:12px;">证件有效期</label><div style="color:#27ae60;">${d.expiryDate}</div></div>
+                </div>
+
+                <h4 style="border-left:4px solid #f39c12; padding-left:10px;">🚚 常用车辆</h4>
+                <table class="data-table" style="margin-bottom:20px;">
+                    <thead><tr><th>车牌号</th><th>类型</th><th>载重</th><th>绑定时间</th><th>状态</th></tr></thead>
+                    <tbody>
+                        <tr><td>${d.plate}</td><td>${d.carType}</td><td>30吨</td><td>2023-01-15</td><td><span style="color:#27ae60">● 使用中</span></td></tr>
+                        <tr><td>苏E·88888</td><td>9.6米 高栏</td><td>18吨</td><td>2024-06-10</td><td><span style="color:#999">● 备用</span></td></tr>
+                    </tbody>
+                </table>
+
+                <h4 style="border-left:4px solid #27ae60; padding-left:10px;">💳 结算账户 (用于运费打款)</h4>
+                <div style="background:#f9f9f9; padding:15px; border-radius:6px; border:1px dashed #ccc;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <span style="font-weight:bold;">中国建设银行 (储蓄卡)</span>
+                        <span style="color:#27ae60;">✅ 鉴权通过</span>
+                    </div>
+                    <div>卡号：6217 0000 8888 9999</div>
+                    <div>户名：张伟</div>
+                    <div>开户行：建行上海浦东支行</div>
+                </div>
+
+            </div>
+        </div>
+      `;
+  }
+
+  // =========================================================================
+  // 61. 司机详情页 (DriverProfileDetail) - [360度画像]
+  // =========================================================================
+  else if (moduleCode === "DriverList") {
+      const driverId = window.g_currentDriverId || "DRV-2025001";
+      // 实际开发中根据ID从数据库取，这里模拟取第一条
+      const d = JSON.parse(sessionStorage.getItem('DriverList'))[0]; 
+
+      contentHTML += `
+        <div style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <button class="btn-primary" style="background:#95a5a6; padding:5px 15px;" onclick="loadContent('DriverProfile')"> < 返回列表</button>
+                <h2 style="display:inline-block; margin-left:15px; vertical-align:middle;">司机档案：<span style="color:#2980b9;">${d.name}</span> <span style="font-size:14px; color:#666; font-weight:normal;">(${d.phone})</span></h2>
+            </div>
+            <div>
+                 <button class="btn-primary" style="background:#e67e22;" onclick="alert('已发送更新证件通知短信')">🔔 催更证件</button>
+                 <button class="btn-primary">💾 保存修改</button>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:20px; align-items:flex-start;">
+            
+            <div style="width:250px; background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                <div style="width:100px; height:100px; background:#eee; border-radius:50%; margin:0 auto 15px; display:flex; align-items:center; justify-content:center; font-size:40px;">👨‍✈️</div>
+                <h3 style="margin:0;">${d.name}</h3>
+                <p style="color:#666; font-size:13px;">注册日期：2023-01-15</p>
+                <div style="margin:15px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; padding:15px 0;">
+                    <div style="font-size:24px; color:#f39c12; font-weight:bold;">${d.score}</div>
+                    <div style="font-size:12px; color:#999;">综合评分 (5.0满分)</div>
+                </div>
+                <div style="text-align:left; font-size:13px; line-height:2;">
+                    <div>累计接单：<span style="float:right; font-weight:bold;">1,203 单</span></div>
+                    <div>准点率：<span style="float:right; font-weight:bold; color:#27ae60;">98.5%</span></div>
+                    <div>货损率：<span style="float:right; font-weight:bold;">0.01%</span></div>
+                </div>
+            </div>
+
+            <div style="flex:1; background:white; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                
+                <div style="border-bottom:1px solid #eee; margin-bottom:20px; display:flex; gap:30px;">
+                    <div style="padding-bottom:10px; border-bottom:3px solid #3498db; color:#3498db; font-weight:bold; cursor:pointer;">基本信息</div>
+                    <div style="padding-bottom:10px; cursor:pointer; color:#666;">车辆绑定 (2)</div>
+                    <div style="padding-bottom:10px; cursor:pointer; color:#666;">收款账户</div>
+                    <div style="padding-bottom:10px; cursor:pointer; color:#666;">证件影像</div>
+                </div>
+
+                <h4 style="border-left:4px solid #3498db; padding-left:10px; margin-top:0;">👤 身份信息</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:20px; margin-bottom:20px;">
+                    <div><label style="color:#999; font-size:12px;">身份证号</label><div style="font-weight:bold;">32010219800101XXXX</div></div>
+                    <div><label style="color:#999; font-size:12px;">驾驶证档案号</label><div style="font-weight:bold;">123456789012</div></div>
+                    <div><label style="color:#999; font-size:12px;">准驾车型</label><div style="font-weight:bold;">${d.license} (包含C1/B2)</div></div>
+                    <div><label style="color:#999; font-size:12px;">初次领证日期</label><div>2010-05-20 (驾龄15年)</div></div>
+                    <div><label style="color:#999; font-size:12px;">从业资格证号</label><div>320000001122</div></div>
+                    <div><label style="color:#999; font-size:12px;">证件有效期</label><div style="color:#27ae60;">${d.expiryDate}</div></div>
+                </div>
+
+                <h4 style="border-left:4px solid #f39c12; padding-left:10px;">🚚 常用车辆</h4>
+                <table class="data-table" style="margin-bottom:20px;">
+                    <thead><tr><th>车牌号</th><th>类型</th><th>载重</th><th>绑定时间</th><th>状态</th></tr></thead>
+                    <tbody>
+                        <tr><td>${d.plate}</td><td>${d.carType}</td><td>30吨</td><td>2023-01-15</td><td><span style="color:#27ae60">● 使用中</span></td></tr>
+                        <tr><td>苏E·88888</td><td>9.6米 高栏</td><td>18吨</td><td>2024-06-10</td><td><span style="color:#999">● 备用</span></td></tr>
+                    </tbody>
+                </table>
+
+                <h4 style="border-left:4px solid #27ae60; padding-left:10px;">💳 结算账户 (用于运费打款)</h4>
+                <div style="background:#f9f9f9; padding:15px; border-radius:6px; border:1px dashed #ccc;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <span style="font-weight:bold;">中国建设银行 (储蓄卡)</span>
+                        <span style="color:#27ae60;">✅ 鉴权通过</span>
+                    </div>
+                    <div>卡号：6217 0000 8888 9999</div>
+                    <div>户名：张伟</div>
+                    <div>开户行：建行上海浦东支行</div>
+                </div>
+
+            </div>
+        </div>
+      `;
+  }
+
   // =========================================================================
   // 35. 折旧计算 (Asset Depreciation)
   // =========================================================================
@@ -4993,7 +5610,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-        <h2>凭证录入 (智能模式)</h2>
+        <h2>凭证录入 </h2>
         <p style="color: #7f8c8d;">选择业务场景和结算方式，系统将自动生成标准凭证。</p>
 
         <div class="action-bar" style="margin-bottom: 20px; border-bottom: 2px solid #ccc; padding-bottom: 10px;">
@@ -5461,11 +6078,161 @@ function loadContent(moduleCode, element = null) {
             </div>
         </div>
     `;
+  }
 
-  
-  
-  
-              }
+
+  // =========================================================================
+  // 57. 权限管理 (Permission) - [RBAC模型 + 数据范围控制]
+  // =========================================================================
+  else if (moduleCode === "Permission") {
+    // 1. 初始化角色数据 (支持缓存)
+    // 预设了三个经典财务角色：CFO、会计、出纳
+    let roleData = JSON.parse(sessionStorage.getItem('RoleConfig'));
+    if (!roleData) {
+      roleData = [
+        { 
+            id: 'role_cfo', 
+            name: '财务总监 (CFO)', 
+            desc: '全公司数据可见，拥有一级审批权', 
+            scope: 'all', // all=全公司, dept=本部门, self=仅本人
+            perms: ['dashboard', 'report', 'audit', 'approval', 'setup'] 
+        },
+        { 
+            id: 'role_acct', 
+            name: '总账会计', 
+            desc: '负责凭证录入、结账与报表出具', 
+            scope: 'dept', 
+            perms: ['voucher', 'ledger', 'settlement', 'asset', 'invoice'] 
+        },
+        { 
+            id: 'role_cashier', 
+            name: '出纳专员', 
+            desc: '负责资金收付，严禁接触总账与审核', 
+            scope: 'self', 
+            perms: ['treasury', 'bank', 'expense'] 
+        }
+      ];
+      sessionStorage.setItem('RoleConfig', JSON.stringify(roleData));
+    }
+
+    // 2. 获取当前选中的角色 (默认第一个)
+    const currentRoleId = window.g_currentRoleSelect || 'role_cfo';
+    const currentRole = roleData.find(r => r.id === currentRoleId) || roleData[0];
+
+    // 3. 生成左侧角色列表 HTML
+    const roleListHtml = roleData.map(r => {
+        const isActive = r.id === currentRoleId ? 'background:#e6f7ff; border-right:3px solid #1890ff;' : '';
+        return `
+            <div onclick="switchRole('${r.id}')" style="padding:15px; cursor:pointer; border-bottom:1px solid #eee; transition:all 0.2s; ${isActive}">
+                <div style="font-weight:bold; color:#333;">${r.name}</div>
+                <div style="font-size:12px; color:#999; margin-top:4px;">${r.desc}</div>
+            </div>
+        `;
+    }).join('');
+
+    // 4. 辅助函数：检查权限是否被选中
+    const isChecked = (code) => currentRole.perms.includes(code) ? 'checked' : '';
+
+    contentHTML += `
+        <h2>角色与权限管理 (RBAC) 🛡️</h2>
+        <p style="color: #7f8c8d;">
+            配置系统角色的功能访问权与数据可见性。系统内置 <b>不相容职责互斥(SoD)</b> 检查。
+        </p>
+
+        <div style="display:flex; height: 650px; border:1px solid #ddd; border-radius:8px; overflow:hidden; background:white;">
+            
+            <div style="width: 280px; background:#f9f9f9; border-right:1px solid #ddd; display:flex; flex-direction:column;">
+                <div style="padding:15px; border-bottom:1px solid #ddd; background:#fff;">
+                    <button class="btn-primary" style="width:100%;" onclick="alert('新增角色功能待开发')">+ 新增角色</button>
+                </div>
+                <div style="flex:1; overflow-y:auto;">
+                    ${roleListHtml}
+                </div>
+            </div>
+
+            <div style="flex:1; padding:25px; overflow-y:auto;">
+                
+                <div style="border-bottom:1px solid #eee; padding-bottom:20px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h3 style="margin:0; color:#2c3e50;">正在配置：<span style="color:#2980b9;">${currentRole.name}</span></h3>
+                        <p style="margin:5px 0 0 0; color:#7f8c8d; font-size:13px;">角色ID: ${currentRole.id}</p>
+                    </div>
+                    <div>
+                        <button class="btn-primary" style="background:#e74c3c;" onclick="deleteRole()">删除角色</button>
+                    </div>
+                </div>
+
+                <div style="background:#fffbe6; border:1px solid #ffe58f; padding:15px; border-radius:6px; margin-bottom:25px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:10px;">👁️ 数据可见范围 (Data Scope)</label>
+                    <select id="scope-select" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <option value="all" ${currentRole.scope === 'all' ? 'selected' : ''}>🏢 全公司数据 (适合老板/CFO/审计)</option>
+                        <option value="dept" ${currentRole.scope === 'dept' ? 'selected' : ''}>📂 仅本部门数据 (适合部门经理)</option>
+                        <option value="self" ${currentRole.scope === 'self' ? 'selected' : ''}>👤 仅本人数据 (适合普通员工)</option>
+                    </select>
+                    <div style="font-size:12px; color:#d48806; margin-top:5px;">* 修改此选项将影响该角色用户在报表和列表中看到的数据量。</div>
+                </div>
+
+                <h4 style="border-left:4px solid #3498db; padding-left:10px; margin-bottom:15px;">功能模块授权</h4>
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                    
+                    <div class="perm-card" style="border:1px solid #eee; padding:15px; border-radius:6px;">
+                        <label style="font-weight:bold; display:block; margin-bottom:10px; color:#2c3e50;">
+                            <input type="checkbox" disabled checked> 📖 账务核算
+                        </label>
+                        <div style="margin-left:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <label><input type="checkbox" class="perm-chk" value="voucher" ${isChecked('voucher')}> 凭证录入</label>
+                            <label><input type="checkbox" class="perm-chk" value="audit" ${isChecked('audit')}> 凭证审核 <span style="color:red;font-size:10px">(互斥)</span></label>
+                            <label><input type="checkbox" class="perm-chk" value="ledger" ${isChecked('ledger')}> 账簿查询</label>
+                            <label><input type="checkbox" class="perm-chk" value="settlement" ${isChecked('settlement')}> 业务结算</label>
+                        </div>
+                    </div>
+
+                    <div class="perm-card" style="border:1px solid #eee; padding:15px; border-radius:6px;">
+                        <label style="font-weight:bold; display:block; margin-bottom:10px; color:#2c3e50;">
+                            <input type="checkbox" disabled checked> 💰 资金与收付
+                        </label>
+                        <div style="margin-left:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <label><input type="checkbox" class="perm-chk" value="treasury" ${isChecked('treasury')}> 收付款执行</label>
+                            <label><input type="checkbox" class="perm-chk" value="bank" ${isChecked('bank')}> 银企直联/对账</label>
+                            <label><input type="checkbox" class="perm-chk" value="expense" ${isChecked('expense')}> 费用报销</label>
+                            <label><input type="checkbox" class="perm-chk" value="approval" ${isChecked('approval')}> 资金审批</label>
+                        </div>
+                    </div>
+
+                    <div class="perm-card" style="border:1px solid #eee; padding:15px; border-radius:6px;">
+                        <label style="font-weight:bold; display:block; margin-bottom:10px; color:#2c3e50;">
+                            <input type="checkbox" disabled checked> 🧾 税务管理
+                        </label>
+                        <div style="margin-left:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <label><input type="checkbox" class="perm-chk" value="invoice" ${isChecked('invoice')}> 销项/进项发票</label>
+                            <label><input type="checkbox" class="perm-chk" value="tax" ${isChecked('tax')}> 纳税申报表</label>
+                        </div>
+                    </div>
+
+                    <div class="perm-card" style="border:1px solid #eee; padding:15px; border-radius:6px;">
+                        <label style="font-weight:bold; display:block; margin-bottom:10px; color:#2c3e50;">
+                            <input type="checkbox" disabled checked> 📊 报表与系统
+                        </label>
+                        <div style="margin-left:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <label><input type="checkbox" class="perm-chk" value="dashboard" ${isChecked('dashboard')}> 经营仪表盘</label>
+                            <label><input type="checkbox" class="perm-chk" value="report" ${isChecked('report')}> 三大财务报表</label>
+                            <label><input type="checkbox" class="perm-chk" value="setup" ${isChecked('setup')}> 基础设置</label>
+                            <label><input type="checkbox" class="perm-chk" value="log" ${isChecked('log')}> 操作日志</label>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div style="margin-top:30px; border-top:1px solid #eee; padding-top:20px; text-align:right;">
+                    <button class="btn-primary" style="background:#95a5a6; margin-right:10px;" onclick="loadContent('Permission')">重置</button>
+                    <button class="btn-primary" style="background:#27ae60; padding:10px 30px;" onclick="saveRoleConfig('${currentRole.id}')">💾 保存配置</button>
+                </div>
+
+            </div>
+        </div>
+    `;
+  }
 
   // =========================================================================
   // 39. 科目汇总表 (AcctSubjectSummary) - [终极修复版：精准汇总]
@@ -6032,7 +6799,7 @@ function loadContent(moduleCode, element = null) {
       : `<button onclick="executeTransfer('2025年11期')" class="btn-primary" style="padding:4px 8px; font-size:12px;">执行结转</button>`;
 
     contentHTML += `
-                    <h2>结转损益 (P&L Transfer) 🔄</h2>
+                    <h2>结转损益 🔄</h2>
                     <p style="color: #7f8c8d;">执行期末自动操作，将所有损益类科目余额结转到本年利润。</p>
                     
                     <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
@@ -6085,7 +6852,7 @@ function loadContent(moduleCode, element = null) {
     if (isClosed) {
       // --- 场景 A：已结账状态 (显示反结账) ---
       contentHTML += `
-                        <h2>月末结账/锁定 (Period End) 🔒</h2>
+                        <h2>月末结账/锁定  🔒</h2>
                         
                         <div style="background: #e8f5e9; padding: 40px; text-align: center; border: 1px solid #27ae60; border-radius: 8px; margin-top: 20px;">
                             <h1 style="color: #27ae60; margin: 0;">✅ 2025年11期 已结账</h1>
@@ -6101,7 +6868,7 @@ function loadContent(moduleCode, element = null) {
     } else {
       // --- 场景 B：未结账状态 (显示检查表) ---
       contentHTML += `
-                        <h2>月末结账/锁定 (Period End) 🔒</h2>
+                        <h2>月末结账/锁定  🔒</h2>
                         <p style="color: #7f8c8d;">执行期末结账，锁定当期数据。结账前需通过所有系统检查。</p>
                         
                         <div class="filter-area" style="background-color: white; padding: 15px; margin-bottom: 20px;">
@@ -6273,7 +7040,7 @@ function loadContent(moduleCode, element = null) {
     const isBalanced = Math.abs(assets.total - rightTotal) < 0.01;
 
     contentHTML += `
-                    <h2>资产负债表 (Balance Sheet) ⚖️</h2>
+                    <h2>资产负债表 ⚖️</h2>
                     <p style="color: #7f8c8d;">数据来源：仅包含您录入的有效凭证。期初余额已清零。</p>
                     
                     <div class="filter-area" style="background-color: white; padding: 15px; margin-bottom: 20px;">
@@ -6412,7 +7179,7 @@ function loadContent(moduleCode, element = null) {
       num < 0 ? "color: #e74c3c; font-weight:bold;" : "color: #333;";
 
     contentHTML += `
-                    <h2>利润损益表 (Income Statement) 📈</h2>
+                    <h2>利润损益表  📈</h2>
                     <p style="color: #7f8c8d;">报告特定会计期间的经营成果，数据来源于已记账凭证。随时监控经营情况</p>
                     
                     <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
@@ -6565,7 +7332,7 @@ function loadContent(moduleCode, element = null) {
         : "";
 
     contentHTML += `
-                    <h2>现金流量表 (Cash Flow) 💸</h2>
+                    <h2>现金流量表  💸</h2>
                     <p style="color: #7f8c8d;">基于凭证自动分析现金流入流出情况 (直接法模拟)。</p>
                     
                     <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom:20px;">
@@ -7089,7 +7856,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>员工花名册 (Employee Roster)</h2>
+                    <h2>员工花名册 </h2>
                     <p style="color: #7f8c8d;">维护公司全员档案。财务发工资、报销打款时，将直接调用此处的【银行卡号】。</p>
                     
                     <div class="action-bar" style="margin-bottom: 15px;">
@@ -7155,7 +7922,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>薪酬核算与发放 (Payroll)</h2>
+                    <h2>薪酬核算与发放</h2>
                     <p style="color: #7f8c8d;">每月核算各部门工资。点击“执行发薪”将自动调用资金模块进行打款，并生成财务凭证。</p>
                     
                     <div class="action-bar" style="margin-bottom: 15px;">
@@ -7357,7 +8124,7 @@ function loadContent(moduleCode, element = null) {
     // ... 在 HRSalaryConfig 模块内 ...
 
     contentHTML += `
-                    <h2>薪酬规则配置 (Configuration) ⚙️</h2>
+                    <h2>薪酬规则配置  ⚙️</h2>
                     <p style="color: #7f8c8d;">设置企业社保公积金缴纳比例、基数上下限及个税起征点。</p>
 
                     <div style="background:white; padding:30px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 900px;">
@@ -7601,7 +8368,7 @@ function loadContent(moduleCode, element = null) {
         : '<tr><td colspan="7">加载中...</td></tr>';
 
     contentHTML += `
-                    <h2>绩效考核 (Performance KPI) 📊</h2>
+                    <h2>绩效考核 📊</h2>
                     <p style="color: #7f8c8d;">录入员工月度考核分数。该分数将直接决定工资中的“绩效工资”实发金额。</p>
 
                     <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px;">
@@ -7653,7 +8420,7 @@ function loadContent(moduleCode, element = null) {
         : "";
 
     contentHTML += `
-                    <h2>考勤管理 (Attendance) 📅</h2>
+                    <h2>考勤管理 📅</h2>
                     <p style="color: #7f8c8d;">录入员工月度请假和加班情况。事假/病假将扣款，加班将增加工资。</p>
 
                     <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px;">
@@ -7773,7 +8540,7 @@ function loadContent(moduleCode, element = null) {
       .join("");
 
     contentHTML += `
-                    <h2>客户档案 (Customer Master Data)</h2>
+                    <h2>客户档案 </h2>
                     <p style="color: #7f8c8d;">管理客户的财务基础信息（开票信息、银行账户）及信用控制策略。</p>
                     
                     <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">

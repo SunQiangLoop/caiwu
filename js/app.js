@@ -1757,3 +1757,294 @@ window.viewReconDetails = function (reconId) {
     // 3. 跳转到详情页
     loadContent('ReconDetail');
 }
+
+
+/** * 功能 1: 催办 (Urge)
+ * 逻辑：模拟发送短信/邮件，实际项目中会调用后端通知接口 
+ */
+window.urgeCarrier = function(id) {
+    // 模拟 loading
+    if(confirm(`确认向承运商发送对账催办通知吗？\n\n单号：${id}`)) {
+        alert(`✅ 催办成功！\n\n系统已通过短信和邮件向对方财务负责人发送提醒。`);
+    }
+}
+
+/** * 功能 2: 调整金额 (Adjust)
+ * 逻辑：允许财务修改金额，通常用于处理“扣款”或“补差”
+ */
+window.adjustCarrierAmount = function(id) {
+    // 1. 读取数据
+    let list = JSON.parse(sessionStorage.getItem('CarrierRecons'));
+    let item = list.find(i => i.id === id);
+    if (!item) return;
+
+    // 2. 弹窗输入
+    const oldAmt = item.amount;
+    const newAmtStr = prompt(`正在调整单据【${id}】\n\n当前应付金额：${oldAmt}\n请输入调整后的金额：`, oldAmt);
+
+    // 3. 处理逻辑
+    if (newAmtStr && newAmtStr !== oldAmt) {
+        const reason = prompt("请输入调整原因 (如：货损扣款、油价补贴)：", "货损扣款");
+        
+        item.amount = parseFloat(newAmtStr.replace(/,/g,'')).toFixed(2);
+        // 记录操作日志逻辑可在此处添加
+        
+        sessionStorage.setItem('CarrierRecons', JSON.stringify(list));
+        alert(`✅ 调整成功！\n\n金额已更新为：${item.amount}\n原因：${reason}`);
+        loadContent('ReconCarrier'); // 刷新列表
+    }
+}
+
+// =======================================================
+// 网点对账交互逻辑 (Site Reconciliation Logic)
+// =======================================================
+
+// 1. 催办功能 (Urge)
+window.urgeSite = function(id) {
+    if(confirm(`确定要向网点发送催办通知吗？\n\n单号：${id}`)) {
+        // 模拟网络请求
+        setTimeout(() => {
+            alert("✅ 催办成功！\n\n已通过【App推送】和【短信】提醒网点负责人尽快确认账单。");
+        }, 300);
+    }
+}
+
+// 2. 查看明细 (View Detail)
+window.viewSiteDetail = function(id) {
+    window.g_currentSiteId = id; // 传递参数
+    loadContent('ReconSiteDetail');
+}
+
+// 3. 调整功能 (Adjust) - 最核心的业务逻辑
+window.adjustSiteRecon = function(id) {
+    let list = JSON.parse(sessionStorage.getItem('SiteRecons'));
+    let item = list.find(i => i.id === id);
+    
+    // 简单模拟：询问调整哪一方
+    const type = prompt(`正在调整【${item.name}】的账单。\n\n请输入要调整的类型 (1 或 2)：\n1. 增加应收 (网点少交了)\n2. 增加应付 (我们少算了)`, "2");
+    
+    if (type === "1" || type === "2") {
+        const amtStr = prompt("请输入调整金额：", "0.00");
+        const amount = parseFloat(amtStr);
+        const reason = prompt("请输入调整原因 (如：系统漏单、协商赔偿)：", "系统数据修正");
+        
+        if (amount > 0) {
+            if (type === "1") item.ar += amount; // 增加应收
+            if (type === "2") item.ap += amount; // 增加应付
+            
+            // 自动变为“已确认”状态方便演示下一步
+            item.status = "已确认"; 
+            
+            sessionStorage.setItem('SiteRecons', JSON.stringify(list));
+            alert(`✅ 调整成功！\n\n金额已更新，且状态自动更为【已确认】(模拟网点同意调整)。\n调整原因：${reason}`);
+            loadContent('ReconSite'); // 刷新
+        }
+    }
+}
+
+// 4. 生成应付单 (Generate AP) - 当我们欠网点钱时
+window.generateSiteAP = function(id, amount) {
+    if(!confirm(`确认将该笔对账单转入【应付管理】吗？\n\n将生成对网点的付款申请：￥${amount}`)) return;
+    
+    // 1. 更新状态
+    updateSiteStatus(id, "已转应付");
+    
+    // 2. 模拟写入AP数据
+    alert(`🎉 操作成功！\n\n付款申请单已生成 (AP-${Date.now().toString().slice(-6)})\n\n下一步：请前往【财务管理 > 供应商付款申请】进行审核付款。`);
+}
+
+// 5. 生成应收单 (Generate AR) - 当网点欠我们钱时
+window.generateSiteAR = function(id, amount) {
+    if(!confirm(`确认将该笔对账单转入【应收管理】吗？\n\n将生成对网点的收款单：￥${amount}`)) return;
+
+    updateSiteStatus(id, "已转应收");
+    
+    alert(`🎉 操作成功！\n\n收款单已生成 (AR-${Date.now().toString().slice(-6)})\n\n系统将自动从网点钱包余额扣除，或请前往【应收管理】发送催缴账单。`);
+}
+
+// 辅助函数：更新状态并刷新
+function updateSiteStatus(id, newStatus) {
+    let list = JSON.parse(sessionStorage.getItem('SiteRecons'));
+    let item = list.find(i => i.id === id);
+    if (item) {
+        item.status = newStatus;
+        sessionStorage.setItem('SiteRecons', JSON.stringify(list));
+        loadContent('ReconSite');
+    }
+}
+
+// =======================================================
+// 进项发票管理逻辑 (Input Invoice Logic)
+// =======================================================
+
+// 1. 模拟打开OCR上传窗口
+window.simulateOCR = function() {
+    const zone = document.getElementById('ocr-upload-zone');
+    if(zone) {
+        zone.style.display = 'block';
+        
+        // 模拟自动识别过程
+        setTimeout(() => {
+            document.getElementById('ocr-progress').style.display = 'block';
+        }, 1000);
+
+        setTimeout(() => {
+            zone.style.display = 'none';
+            // 模拟识别出一张新发票
+            addMockInvoice();
+        }, 3000);
+    }
+}
+
+// 2. 关闭OCR窗口
+window.closeOCR = function() {
+    document.getElementById('ocr-upload-zone').style.display = 'none';
+}
+
+// 3. 模拟OCR识别成功后，自动添加一行数据
+function addMockInvoice() {
+    let list = JSON.parse(sessionStorage.getItem('InputInvoices') || "[]");
+    
+    const newInv = {
+        id: `INV-IN-${Date.now()}`,
+        code: "031002003322",
+        number: Math.floor(Math.random() * 89999999 + 10000000).toString(),
+        supplier: "阿里云计算有限公司",
+        type: "电专",
+        rate: "6%",
+        amount: 1000.00,
+        tax: 60.00,
+        total: 1060.00,
+        date: new Date().toISOString().split('T')[0],
+        status: "未认证",
+        risk: "正常"
+    };
+    
+    list.unshift(newInv);
+    sessionStorage.setItem('InputInvoices', JSON.stringify(list));
+    
+    alert(`✅ OCR识别成功！\n\n已提取发票：${newInv.number}\n销方：${newInv.supplier}\n金额：${newInv.total}\n\n系统已自动进行“四要素”校验，发票真实有效。`);
+    
+    // 刷新页面
+    loadContent('APInvoiceManage');
+}
+
+// 4. 联网认证/验真 (Verify)
+window.verifyInvoice = function(id) {
+    if(!confirm("确定要将此发票提交至【国税底账库】进行认证抵扣勾选吗？")) return;
+    
+    // 模拟API请求延迟
+    const btn = event.target;
+    const originalText = btn.innerText;
+    btn.innerText = "认证中...";
+    btn.disabled = true;
+
+    setTimeout(() => {
+        let list = JSON.parse(sessionStorage.getItem('InputInvoices'));
+        let item = list.find(i => i.id === id);
+        if (item) {
+            item.status = "已认证";
+            sessionStorage.setItem('InputInvoices', JSON.stringify(list));
+            alert("✅ 认证成功！\n\n该发票税额已计入本期【进项抵扣池】。");
+            loadContent('APInvoiceManage');
+        }
+    }, 800);
+}
+
+// 5. 查看发票影像
+window.viewInvoiceImg = function(num) {
+    alert(`正在调取发票影像...\n\n发票号码：${num}\n(弹出PDF预览或图片)`);
+}
+
+
+// =======================================================
+// 权限管理交互逻辑 (Permission Logic)
+// =======================================================
+
+// 1. 切换角色视图
+window.switchRole = function(roleId) {
+    // 设置全局变量，记录当前选中的是哪个角色
+    window.g_currentRoleSelect = roleId;
+    // 重新加载页面，渲染该角色的数据
+    loadContent('Permission');
+}
+
+// 2. 保存权限配置
+window.saveRoleConfig = function(roleId) {
+    // 1. 获取最新配置
+    const scope = document.getElementById('scope-select').value;
+    const checkedBoxes = document.querySelectorAll('.perm-chk:checked');
+    const newPerms = Array.from(checkedBoxes).map(cb => cb.value);
+
+    // 2. ★★★ 核心风控：不相容职务分离 (SoD) 检查 ★★★
+    // 规则：制单人(voucher) 和 审核人(audit) 不能是同一人
+    // 规则：出纳(treasury) 不能兼管 会计档案/总账(ledger)
+    let warningMsg = "";
+    
+    if (newPerms.includes('voucher') && newPerms.includes('audit')) {
+        warningMsg += "⚠️ 违规风险：【凭证录入】与【凭证审核】属于不相容职务，建议分离！\n";
+    }
+    
+    if (newPerms.includes('treasury') && newPerms.includes('ledger')) {
+        warningMsg += "⚠️ 违规风险：【资金收付】与【总账查询】建议分离，以防挪用公款！\n";
+    }
+
+    if (warningMsg) {
+        warningMsg += "\n是否忽略风险强制保存？";
+        if (!confirm(warningMsg)) return; // 用户点取消，则不保存
+    }
+
+    // 3. 更新 sessionStorage
+    let roleData = JSON.parse(sessionStorage.getItem('RoleConfig'));
+    let role = roleData.find(r => r.id === roleId);
+    if (role) {
+        role.scope = scope;
+        role.perms = newPerms;
+        sessionStorage.setItem('RoleConfig', JSON.stringify(roleData));
+        alert(`✅ 保存成功！\n\n角色【${role.name}】的权限已更新。\n下一次该角色用户登录时生效。`);
+    }
+}
+
+// 3. 删除角色 (模拟)
+window.deleteRole = function() {
+    alert("⛔ 系统内置基础角色不可删除！");
+}
+
+
+
+// =======================================================
+// 司机档案管理逻辑 (Driver Profile Logic)
+// =======================================================
+
+// 1. 跳转详情页
+window.viewDriverDetail = function(id) {
+    window.g_currentDriverId = id; // 全局传参
+    loadContent('DriverProfileDetail');
+}
+
+// 2. 拉黑/解禁司机 (风控核心)
+window.toggleDriverStatus = function(id) {
+    let list = JSON.parse(sessionStorage.getItem('DriverList'));
+    let item = list.find(d => d.id === id);
+    if (!item) return;
+
+    if (item.status === '黑名单') {
+        if(confirm(`确认解禁司机【${item.name}】吗？\n\n解禁后该司机可恢复接单。`)) {
+            item.status = '启用';
+            alert('✅ 司机已解禁，恢复正常接单权限。');
+        }
+    } else {
+        const reason = prompt(`⚠️ 警告：正在拉黑司机【${item.name}】\n\n请输入拉黑原因 (如: 偷油、多次爽约)：`, "严重违反公司规定");
+        if (reason) {
+            item.status = '黑名单';
+            // 可以在这里调用 addAuditLog 记录风控日志
+            alert(`⛔ 司机已拉黑！\n系统将自动拦截该司机的任何派车请求。`);
+        } else {
+            return; // 取消拉黑
+        }
+    }
+    
+    // 保存并刷新
+    sessionStorage.setItem('DriverList', JSON.stringify(list));
+    loadContent('DriverProfile');
+}
