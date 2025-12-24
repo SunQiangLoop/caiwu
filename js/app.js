@@ -2048,3 +2048,5 @@ window.toggleDriverStatus = function(id) {
     sessionStorage.setItem('DriverList', JSON.stringify(list));
     loadContent('DriverProfile');
 }
+
+

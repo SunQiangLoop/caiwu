@@ -70,7 +70,7 @@ function getModuleName(code) {
     BankStatementSync: "银行对账单同步",
     OnlinePayment: "线上支付/代收付",
     BankBalanceQuery: "银行余额实时查询",
-    BasicSetup: "基础设置",
+    // BasicSetup: "基础设置",
     Permission: "权限管理",
     DriverProfileDetail: "司机档案详情",
    
@@ -168,11 +168,7 @@ function loadContent(moduleCode, element = null) {
     const flowHtml = `
                     <div class="flow-container">
                         
-                        <div class="flow-step" onclick="loadContent('BasicSetup')">
-                            <div class="flow-icon">⚙️</div>
-                            <div class="flow-title">基础设置</div>
-                        </div>
-                        <div class="flow-arrow">➔</div>
+                      
 
                         <div class="flow-step" onclick="loadContent('VoucherEntryReview')">
                             <div class="flow-icon">📝</div>
@@ -396,209 +392,545 @@ function loadContent(moduleCode, element = null) {
                 `;
   }
 
-  // =========================================================================
-  // 1.2 干线批次结算 (SettlementTrunk) - [成本核算]
+// =========================================================================
+  // 5. 干线批次结算 (SettlementTrunk) - [数据升级：支持详尽费用明细]
   // =========================================================================
   else if (moduleCode === "SettlementTrunk") {
-    // 模拟数据
-    const trunkBatches = [
-      {
-        id: "PC-20251120-01",
-        driver: "李铁柱",
-        plate: "苏E·88888",
-        route: "上海 -> 北京",
-        date: "2025-11-20",
-        totalCost: "8,500.00",
-        payType: "现金3000+油卡5500",
-        status: "待结算",
-      },
-      {
-        id: "PC-20251120-02",
-        driver: "王大拿",
-        plate: "沪B·66666",
-        route: "杭州 -> 广州",
-        date: "2025-11-21",
-        totalCost: "12,000.00",
-        payType: "全额现金",
-        status: "已结算",
-      },
-      {
-        id: "PC-20251121-05",
-        driver: "顺丰车队",
-        plate: "京A·55555",
-        route: "苏州 -> 武汉",
-        date: "2025-11-22",
-        totalCost: "6,800.00",
-        payType: "月结",
-        status: "已审核",
-      },
-    ];
+    let trunkBatches = JSON.parse(sessionStorage.getItem('TrunkBatches'));
+    
+    // 如果数据结构里没有 unloading (卸车费)，强制刷新数据
+    if (trunkBatches && trunkBatches.length > 0 && trunkBatches[0].fees.unloading === undefined) {
+        trunkBatches = null; 
+    }
 
-    const rows = trunkBatches
-      .map((b) => {
-        let color = "#333";
-        let action = "";
+    if (!trunkBatches || trunkBatches.length < 5) {
+      trunkBatches = [];
+      const routeMap = [
+          { r: "上海->北京", b: "上海浦东分拨中心", dest: "北京顺义转运场" },
+          { r: "广州->武汉", b: "广州白云转运中心", dest: "武汉东西湖分拨" },
+          { r: "成都->西安", b: "成都双流集散仓", dest: "西安沣东转运中心" },
+          { r: "深圳->长沙", b: "深圳宝安分拨中心", dest: "长沙雨花集散地" },
+          { r: "杭州->郑州", b: "杭州萧山转运场", dest: "郑州经开分拨" }
+      ];
+      const drivers = ["张三", "李四", "王五", "赵六", "钱七", "孙八", "周九", "吴十", "郑十一", "卫十二"];
+      const batchStatuses = ["运输中", "已到达", "已卸车", "已发车"];
+      const payTypes = ["现付", "到付", "回单付", "月结"];
 
-        if (b.status === "待结算") {
-          color = "#f39c12";
-          action = `<a href="#" style="color:#27ae60; font-weight:bold;">计算费用</a>`;
-        } else if (b.status === "已结算") {
-          color = "#27ae60";
-          action = `<a href="#" style="color:#3498db;">提交审核</a> | <a href="#" style="color:#e74c3c;">调整</a>`;
-        } else {
-          color = "#999";
-          action = `<span style="color:#ccc;">查看</span>`;
+      for (let i = 1; i <= 10; i++) {
+          const isSettled = i <= 3; 
+          const currentPayType = payTypes[i % 4]; 
+          const routeInfo = routeMap[i % 5];
+          const dateBase = `2025-11-${10 + i}`;
+          
+          // ★★★ 费用构成模拟 ★★★
+          const baseFee = 2500 + (i * 100); // 干线费
+          const loadFee = 200;              // 装车费
+          const unloadFee = i % 2 === 0 ? 150 : 0; // 卸车费 (偶数行有)
+          const abnFee = i % 3 === 0 ? 50 : 0;     // 异动费 (每3行有)
+          const otherFee = i % 5 === 0 ? 100 : 0;  // 其他费 (每5行有)
+          
+          const total = baseFee + loadFee + unloadFee + abnFee + otherFee;
+
+          trunkBatches.push({
+              id: `APC2511${i.toString().padStart(3, '0')}`,
+              branch: routeInfo.b,
+              route: routeInfo.r,
+              plate: `沪A${1000 + i}`,
+              driver: drivers[i-1],
+              date: dateBase,
+              batchStatus: batchStatuses[i % 4], 
+              settlementStatus: isSettled ? "已结算" : "待结算",
+              paymentType: currentPayType,
+              
+              totalAmount: total,  
+              paidAmount: isSettled ? total : 0, 
+
+              // ★★★ 详细费用结构 ★★★
+              fees: { 
+                  trunk: baseFee,         // 干线费
+                  loading: loadFee,       // 装车费
+                  unloading: unloadFee,   // 卸车费
+                  abnormal: abnFee,       // 异动费
+                  abnormalDesc: "停车费", // 异动说明
+                  other: otherFee,        // 其他费
+                  otherDesc: "雨布耗材"   // 其他说明
+              },
+
+              timeline: [
+                  { time: `${dateBase} 08:30`, event: "创建批次，等待装车" },
+                  { time: `${dateBase} 10:30`, event: "司机已发车" },
+                  { time: `${dateBase} 23:45`, event: `预计到达【${routeInfo.dest}】` }
+              ]
+          });
+      }
+      sessionStorage.setItem('TrunkBatches', JSON.stringify(trunkBatches));
+    }
+
+    // 渲染表格 (保持原样，只做简单展示)
+    const rows = trunkBatches.map(row => {
+        let batchBadge = "";
+        switch(row.batchStatus) {
+            case '已卸车': batchBadge = `<span style="color:#27ae60; border:1px solid #27ae60; padding:1px 4px; border-radius:3px; font-size:11px;"> 已卸车</span>`; break;
+            case '运输中': batchBadge = `<span style="color:#3498db; border:1px solid #3498db; padding:1px 4px; border-radius:3px; font-size:11px;"> 运输中</span>`; break;
+            default: batchBadge = `<span style="color:#f39c12; border:1px solid #f39c12; padding:1px 4px; border-radius:3px; font-size:11px;">${row.batchStatus}</span>`;
         }
 
+        let typeBadge = "";
+        if (row.paymentType === '现付') typeBadge = `<span style="color:#e67e22; background:#fff7e6; padding:2px 6px; border-radius:4px;"> 现付</span>`;
+        else if (row.paymentType === '到付') typeBadge = `<span style="color:#2980b9; background:#e6f7ff; padding:2px 6px; border-radius:4px;"> 到付</span>`;
+        else if (row.paymentType === '回单付') typeBadge = `<span style="color:#8e44ad; background:#f3e5f5; padding:2px 6px; border-radius:4px;"> 回单付</span>`;
+        else typeBadge = `<span style="color:#16a085; background:#e8f8f5; padding:2px 6px; border-radius:4px;"> 月结</span>`;
+
+        const moneyHtml = row.settlementStatus === '已结算' 
+            ? `<div style="color:#27ae60; font-weight:bold; font-size:15px;">${row.totalAmount.toLocaleString()} <span style="font-size:12px">✔</span></div>`
+            : `<div style="color:#e74c3c; font-weight:bold; font-size:15px;">${row.totalAmount.toLocaleString()}</div>`;
+
+        let actionBtn = row.settlementStatus === '已结算'
+            ? `<span style="color:#ccc; font-size:12px;">已转应付</span>`
+            : `<button class="btn-primary" style="padding:4px 10px; font-size:12px;" onclick="sendToAP('${row.id}')">结算</button>`;
+
         return `
-                        <tr>
-                            <td><span style="font-weight:bold; color:#2980b9;">${b.id}</span></td>
-                            <td>
-                                <div>${b.driver}</div>
-                                <div style="font-size:12px; color:#999;">${b.plate}</div>
-                            </td>
-                            <td>${b.route}</td>
-                            <td>${b.date}</td>
-                            <td style="text-align:right; font-weight:bold;">${b.totalCost}</td>
-                            <td style="font-size:12px; color:#666;">${b.payType}</td>
-                            <td><span style="color:${color}; font-weight:bold;">${b.status}</span></td>
-                            <td>${action}</td>
-                        </tr>
-                    `;
-      })
-      .join("");
+            <tr>
+                <td><a href="javascript:void(0)" onclick="viewTrunkDetail('${row.id}')" style="font-weight:bold; color:#3498db;">${row.id}</a></td>
+                <td>${row.branch}</td>
+                <td><span style="color:#333; font-weight:500;">${row.route}</span></td>
+                <td><div style="font-weight:bold;">${row.plate}</div><div style="font-size:12px; color:#666;">${row.driver}</div></td>
+                <td>${batchBadge}</td>
+                <td>${typeBadge}</td>
+                <td style="text-align:right;">${moneyHtml}</td>
+                <td style="text-align:right; font-size:12px; color:#999;"> </td>
+                <td>${row.settlementStatus === '已结算' ? '<span style="color:#27ae60;">已结算</span>' : '<span style="color:#e74c3c;">待结算</span>'}</td>
+                <td>${actionBtn}</td>
+            </tr>
+        `;
+    }).join('');
 
     contentHTML += `
-                    <h2>干线批次结算 </h2>
-                    <p style="color:#7f8c8d;">核算长途运输车辆的单趟成本。支持设置现金、油卡、ETC的支付比例。</p>
-                    
-                    <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px; display:flex; gap:10px;">
-                        <input type="text" placeholder="批次号/车牌/司机" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:200px;">
-                        <input type="date" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
-                        <select style="padding:8px; border:1px solid #ccc; border-radius:4px;">
-                            <option>全部状态</option>
-                            <option>待结算</option>
-                            <option>已结算</option>
-                        </select>
-                        <button class="btn-primary">查询</button>
-                        <button class="btn-primary" style="background-color:#f39c12; margin-left:auto;">+ 补录手工成本</button>
-                    </div>
+        <h2>干线批次结算 (Trunk Settlement)</h2>
+        <div class="filter-area" style="display:flex; gap:10px; margin-bottom:15px;">
+            <input type="text" placeholder="批次号/车牌" style="padding:8px; border:1px solid #ccc;">
+            <select style="padding:8px; border:1px solid #ccc;"><option>全部支付方式</option><option>现付</option><option>到付</option><option>回单付</option><option>月结</option></select>
+            <button class="btn-primary">查询</button>
+        </div>
+        <table class="data-table">
+            <thead><tr><th>批次号</th><th>出发网点</th><th>线路</th><th>车辆/司机</th><th>批次状态</th><th>支付方式</th><th style="text-align:right;">总运费</th><th style="text-align:right;">费用备注</th><th>结算状态</th><th>操作</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+  }
 
+// =========================================================================
+  // 5.1 干线批次详情页 (SettlementTrunkDetail) - [全字段固定展示版]
+  // =========================================================================
+  else if (moduleCode === "SettlementTrunkDetail") {
+      const id = window.g_currentTrunkId;
+      const list = JSON.parse(sessionStorage.getItem('TrunkBatches') || "[]");
+      const item = list.find(i => i.id === id);
+
+      if (!item) {
+          contentHTML += `<div style="padding:20px;"><h3>⚠️ 数据缺失</h3><button class="btn-primary" onclick="loadContent('SettlementTrunk')">返回列表</button></div>`;
+      } else {
+          // 1. 时间轴 (保持不变)
+          const timelineHtml = item.timeline ? item.timeline.map((t, index) => {
+              const isLast = index === item.timeline.length - 1;
+              const color = isLast ? '#27ae60' : '#3498db';
+              return `
+              <div style="display:flex; margin-bottom:0;">
+                  <div style="width:140px; text-align:right; padding-right:15px; color:#999; font-size:12px; padding-top:2px;">${t.time}</div>
+                  <div style="position:relative; border-left:2px solid #eee; padding-left:20px; padding-bottom:20px;">
+                      <div style="position:absolute; left:-6px; top:4px; width:10px; height:10px; border-radius:50%; background:${color}; border:2px solid white; box-shadow:0 0 0 1px ${color};"></div>
+                      <div style="font-size:13px; color:#333; font-weight:${isLast?'bold':'normal'}">${t.event}</div>
+                  </div>
+              </div>`}).join('') : '';
+
+          // ★★★ 2. 费用明细 (核心修改：全字段列举，0元留空) ★★★
+          const fees = item.fees || {};
+          let feeRows = "";
+
+          // 辅助函数：如果金额>0显示金额，否则显示 "-"；说明栏同理
+          const fmtVal = (val) => (val && val > 0) ? val.toLocaleString() : '-';
+          const fmtDesc = (val, desc) => (val && val > 0) ? desc : '';
+
+          // (1) 干线费
+          feeRows += `
+            <tr>
+                <td>干线运费</td>
+                <td style="text-align:right; font-weight:bold;">${fmtVal(fees.trunk)}</td>
+                <td style="text-align:right; color:#999;">${fmtDesc(fees.trunk, '基础运费')}</td>
+            </tr>`;
+
+          // (2) 装车费
+          feeRows += `
+            <tr>
+                <td>装车费</td>
+                <td style="text-align:right;">${fmtVal(fees.loading)}</td>
+                <td style="text-align:right; color:#999;">${fmtDesc(fees.loading, '始发操作')}</td>
+            </tr>`;
+
+          // (3) 卸车费
+          feeRows += `
+            <tr>
+                <td>卸车费</td>
+                <td style="text-align:right;">${fmtVal(fees.unloading)}</td>
+                <td style="text-align:right; color:#999;">${fmtDesc(fees.unloading, '到达操作')}</td>
+            </tr>`;
+
+          // (4) 异动费用
+          feeRows += `
+            <tr>
+                <td style="${fees.abnormal>0 ? 'color:#d35400;' : ''}">异动费用</td>
+                <td style="text-align:right; ${fees.abnormal>0 ? 'color:#d35400;' : ''}">${fmtVal(fees.abnormal)}</td>
+                <td style="text-align:right; color:#999;">${fmtDesc(fees.abnormal, fees.abnormalDesc)}</td>
+            </tr>`;
+
+          // (5) 其他费用
+          feeRows += `
+            <tr>
+                <td>其他费用</td>
+                <td style="text-align:right;">${fmtVal(fees.other)}</td>
+                <td style="text-align:right; color:#999;">${fmtDesc(fees.other, fees.otherDesc)}</td>
+            </tr>`;
+
+
+          const actionBtn = item.settlementStatus === '已结算'
+              ? `<button class="btn-primary" disabled style="background:#ccc; cursor:not-allowed;">已转应付</button>`
+              : `<button class="btn-primary" style="background:#27ae60;" onclick="sendToAP('${item.id}')">发起结算</button>`;
+
+          contentHTML += `
+            <div style="margin-bottom:20px;">
+                <button class="btn-primary" style="background:#95a5a6; padding:5px 15px;" onclick="loadContent('SettlementTrunk')"> < 返回列表</button>
+                <h2 style="display:inline-block; margin-left:15px; vertical-align:middle;">批次详情：<span style="color:#2980b9;">${item.id}</span></h2>
+            </div>
+
+            <div style="display:flex; gap:20px;">
+                <div style="flex:1;">
+                    <div style="background:white; padding:20px; border-radius:8px; margin-bottom:20px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                        <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">🚛 运输信息</h3>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:14px;">
+                            <div><label style="color:#999;">出发网点：</label> <b>${item.branch}</b></div>
+                            <div><label style="color:#999;">线路：</label> <b>${item.route}</b></div>
+                            <div><label style="color:#999;">状态：</label> <b style="color:#2980b9">${item.batchStatus}</b></div>
+                            <div><label style="color:#999;">车牌：</label> ${item.plate}</div>
+                            <div><label style="color:#999;">司机：</label> ${item.driver}</div>
+                            <div><label style="color:#999;">发车时间：</label> ${item.date}</div>
+                        </div>
+                    </div>
+                    <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                        <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📍 运输轨迹 (Tracking)</h3>
+                        <div style="padding-top:10px;">${timelineHtml}</div>
+                    </div>
+                </div>
+
+                <div style="flex:1; height:fit-content; background:white; padding:20px; border-radius:8px; border-top:4px solid #e67e22; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin-top:0;">💰 费用结算</h3>
+                        <span style="padding:4px 8px; border-radius:4px; font-size:12px; ${item.settlementStatus==='已结算'?'background:#e6f7ff;color:#2980b9':'background:#fff7e6;color:#e67e22'}">
+                            ${item.settlementStatus}
+                        </span>
+                    </div>
                     <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>发车批次号</th>
-                                <th>司机/车牌</th>
-                                <th>运输路线</th>
-                                <th>发车日期</th>
-                                <th style="text-align:right;">应付运费</th>
-                                <th>支付结构</th>
-                                <th>状态</th>
-                                <th>操作</th>
+                        <thead><tr><th>费用项目</th><th style="text-align:right">金额 (RMB)</th><th style="text-align:right">备注</th></tr></thead>
+                        <tbody>
+                            ${feeRows}
+                            <tr style="font-weight:bold; background:#f9f9f9; border-top:2px solid #eee;">
+                                <td>应付总额</td>
+                                <td style="text-align:right; font-size:18px; color:#e74c3c;">${item.totalAmount.toLocaleString()}</td>
+                                <td style="text-align:right;">${item.paymentType}</td>
                             </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
+                        </tbody>
                     </table>
-                `;
+                    <div style="margin-top:30px; text-align:right;">${actionBtn}</div>
+                </div>
+            </div>
+          `;
+      }
   }
 
   // =========================================================================
-  // 1.3 短途批次结算 (SettlementShortHaul) - [接送货成本]
+  // 15. 供应商付款申请 (APPaymentApply) - [增加：支付与取消逻辑]
   // =========================================================================
-  else if (moduleCode === "SettlementShortHaul") {
-    const shortBatches = [
-      {
-        id: "SH-20251120-A",
-        driver: "同城-张三",
-        type: "提货",
-        count: "5单",
-        area: "浦东新区",
-        amount: "300.00",
-        status: "待确认",
-      },
-      {
-        id: "SH-20251120-B",
-        driver: "同城-李四",
-        type: "送货",
-        count: "12单",
-        area: "闵行区",
-        amount: "550.00",
-        status: "已确认",
-      },
-      {
-        id: "SH-20251120-C",
-        driver: "外部-货拉拉",
-        type: "临时",
-        count: "1车",
-        area: "松江区",
-        amount: "180.00",
-        status: "已支付",
-      },
-    ];
+  else if (moduleCode === "APPaymentApply") {
+    let apList = JSON.parse(sessionStorage.getItem('APApplications') || "[]");
 
-    const rows = shortBatches
-      .map(
-        (b) => `
-                    <tr>
-                        <td>${b.id}</td>
-                        <td>${b.driver}</td>
-                        <td><span style="padding:2px 5px; border-radius:4px; background:${
-                          b.type === "提货" ? "#e6f7ff" : "#f6ffed"
-                        }; color:${
-          b.type === "提货" ? "#1890ff" : "#52c41a"
-        }; font-size:12px;">${b.type}</span></td>
-                        <td>${b.area}</td>
-                        <td>${b.count}</td>
-                        <td style="text-align:right; font-weight:bold;">${
-                          b.amount
-                        }</td>
-                        <td>${b.status}</td>
-                        <td>
-                            <a href="#" style="color:#3498db;">明细</a>
-                            ${
-                              b.status === "待确认"
-                                ? ' | <a href="#" style="color:#27ae60;">确认</a>'
-                                : ""
-                            }
-                        </td>
-                    </tr>
-                `
-      )
-      .join("");
+    const rows = apList.map(row => {
+        let statusHtml = "";
+        let operateHtml = "";
+
+        // 状态与按钮逻辑
+        if (row.status === '已支付') {
+            statusHtml = `<span style="color:#27ae60; background:#f0f9f0; padding:2px 6px; border-radius:4px;">✔ 已支付</span>`;
+            operateHtml = `<button class="btn-primary" style="background:#f39c12; padding:2px 8px; font-size:12px;" onclick="revokePayment('${row.apId}')">撤销支付</button>`;
+        } else {
+            statusHtml = `<span style="color:#f39c12; background:#fff7e6; padding:2px 6px; border-radius:4px;">⏳ 待付款</span>`;
+            operateHtml = `
+                <button class="btn-primary" style="background:#27ae60; padding:2px 8px; font-size:12px;" onclick="confirmPayment('${row.apId}')">确认支付</button>
+                <button class="btn-primary" style="background:#e74c3c; padding:2px 8px; font-size:12px;" onclick="cancelSettlement('${row.apId}', '${row.sourceId}')">取消结算</button>
+            `;
+        }
+
+        // 判断来源文字
+        let sourceType = "未知";
+        if (row.sourceId.startsWith('APC')) sourceType = "干线批次";
+        else if (row.sourceId.startsWith('SH')) sourceType = "短途批次"; // ★ 显示短途
+
+        return `
+            <tr>
+                <td>${row.apId}</td>
+                <td>
+                    <a href="javascript:void(0)" onclick="jumpToSourceDetail('${row.sourceId}')" style="font-weight:bold; color:#3498db; text-decoration:underline;">
+                        ${row.sourceId}
+                    </a>
+                    <div style="font-size:12px; color:#999;">来源: ${sourceType}</div>
+                </td>
+                <td>${row.payee}</td>
+                <td style="text-align:right; font-weight:bold; color:#333;">${row.amount.toLocaleString()}</td>
+                <td>${row.applyDate}</td>
+                <td>${statusHtml}</td>
+                <td>${operateHtml}</td>
+            </tr>
+        `;
+    }).join('');
 
     contentHTML += `
-                    <h2>短途批次结算 </h2>
-                    <p style="color:#7f8c8d;">核算同城提货、送货费用。支持按单、按方数或按车次一口价结算。</p>
+        <h2>应付管理 / 付款申请 (AP Management)</h2>
+        <div class="filter-area" style="margin-bottom:15px;">
+            <input type="text" placeholder="申请单号/源单号" style="padding:8px; border:1px solid #ccc;">
+            <select style="padding:8px; border:1px solid #ccc;">
+                <option>全部状态</option>
+                <option>待付款</option>
+                <option>已支付</option>
+            </select>
+            <button class="btn-primary">查询</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>申请单号</th><th>源单据号</th><th>收款方</th>
+                    <th style="text-align:right;">应付金额</th><th>申请日期</th><th>状态</th><th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.length ? rows : '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">暂无应付申请</td></tr>'}
+            </tbody>
+        </table>
+    `;
+
+}
+
+
+
+
+// =========================================================================
+  // 6. 短途批次结算 (SettlementShortHaul) - [同城配送/接送货]
+  // =========================================================================
+  else if (moduleCode === "SettlementShortHaul") {
+    let shortBatches = JSON.parse(sessionStorage.getItem('ShortBatches'));
+
+    // 初始化模拟数据
+    if (!shortBatches || shortBatches.length < 5) {
+      shortBatches = [];
+      const areas = ["浦东新区配送", "徐汇-闵行专线", "虹桥机场提货", "宝山仓库-市区", "松江工业区接货"];
+      const drivers = ["刘一", "陈二", "张三丰", "李小龙", "王五", "赵六", "钱七", "孙八", "周九", "吴十"];
+      // 短途特有的计费模式
+      const feeTypes = ["按趟计费", "按重量计费", "按票数计费"]; 
+
+      for (let i = 1; i <= 10; i++) {
+          const isSettled = i <= 3;
+          const type = feeTypes[i % 3];
+          
+          // 模拟工作量
+          const orderCount = 5 + Math.floor(Math.random() * 10); // 5-15票
+          const totalWeight = 200 + Math.floor(Math.random() * 800); // 200-1000kg
+          
+          // 根据模式计算运费
+          let baseFee = 0;
+          if (type === "按趟计费") baseFee = 300;
+          if (type === "按重量计费") baseFee = totalWeight * 0.8; // 0.8元/kg
+          if (type === "按票数计费") baseFee = orderCount * 30;   // 30元/票
+
+          // 杂费
+          const multiPointFee = i % 2 === 0 ? 50 : 0; // 多点费
+          const upstairsFee = i % 5 === 0 ? 30 : 0;   // 上楼费
+          const total = Math.round(baseFee + multiPointFee + upstairsFee);
+
+          shortBatches.push({
+              id: `SH2511${i.toString().padStart(3, '0')}`,
+              area: areas[i % 5],
+              driver: drivers[i-1],
+              plate: `沪C${8000 + i}`, // 蓝牌货车
+              date: `2025-11-${10 + i}`,
+              status: isSettled ? "已结算" : "待结算",
+              
+              // ★★★ 短途核心字段 ★★★
+              workload: { count: orderCount, weight: totalWeight }, // 工作量
+              feeType: type, // 计费模式
+              
+              totalAmount: total,
+              fees: {
+                  base: baseFee,
+                  multiPoint: multiPointFee,
+                  upstairs: upstairsFee,
+                  other: 0
+              }
+          });
+      }
+      sessionStorage.setItem('ShortBatches', JSON.stringify(shortBatches));
+    }
+
+    const rows = shortBatches.map(row => {
+        // 计费模式标签
+        let typeBadge = "";
+        if (row.feeType === '按趟计费') typeBadge = `<span style="color:#2c3e50; background:#ecf0f1; padding:2px 6px; border-radius:4px; font-size:11px;">🚚 按趟 (包车)</span>`;
+        else if (row.feeType === '按重量计费') typeBadge = `<span style="color:#d35400; background:#fdebd0; padding:2px 6px; border-radius:4px; font-size:11px;">⚖️ 按重 (${row.workload.weight}kg)</span>`;
+        else typeBadge = `<span style="color:#2980b9; background:#eaf2f8; padding:2px 6px; border-radius:4px; font-size:11px;">🔢 按票 (${row.workload.count}票)</span>`;
+
+        // 金额显示
+        const moneyHtml = row.status === '已结算' 
+            ? `<div style="color:#27ae60; font-weight:bold;">${row.totalAmount.toLocaleString()} ✔</div>`
+            : `<div style="color:#e74c3c; font-weight:bold;">${row.totalAmount.toLocaleString()}</div>`;
+
+        // 杂费简述
+        let extraStr = [];
+        if(row.fees.multiPoint > 0) extraStr.push(`多点:${row.fees.multiPoint}`);
+        if(row.fees.upstairs > 0) extraStr.push(`上楼:${row.fees.upstairs}`);
+        const extraDesc = extraStr.length > 0 ? `<div style="font-size:11px; color:#999;">含: ${extraStr.join('+')}</div>` : '';
+
+        const actionBtn = row.status === '已结算'
+            ? `<span style="color:#ccc; font-size:12px;">已转应付</span>`
+            : `<button class="btn-primary" style="padding:4px 10px; font-size:12px;" onclick="settleShortHaul('${row.id}')">结算</button>`;
+
+        return `
+            <tr>
+                <td><a href="javascript:void(0)" onclick="viewShortHaulDetail('${row.id}')" style="font-weight:bold; color:#3498db;">${row.id}</a></td>
+                <td>
+                    <div style="font-weight:bold;">${row.area}</div>
+                    <div style="font-size:12px; color:#999;">${row.date}</div>
+                </td>
+                <td>${row.driver} <span style="color:#ccc">|</span> ${row.plate}</td>
+                <td>
+                    <div style="font-weight:bold;">${row.workload.count} 票</div>
+                    <div style="font-size:12px; color:#666;">${row.workload.weight} kg</div>
+                </td>
+                <td>${typeBadge}</td>
+                <td style="text-align:right;">
+                    ${moneyHtml}
+                    ${extraDesc}
+                </td>
+                <td>
+                    ${row.status === '已结算' ? '<span style="color:#27ae60;">已结算</span>' : '<span style="color:#e74c3c;">待结算</span>'}
+                </td>
+                <td>${actionBtn}</td>
+            </tr>
+        `;
+    }).join('');
+
+    contentHTML += `
+        <h2>短途批次结算 (City Delivery Settlement)</h2>
+        <div class="filter-area" style="display:flex; gap:10px; margin-bottom:15px;">
+            <input type="text" placeholder="批次/司机/区域" style="padding:8px; border:1px solid #ccc;">
+            <select style="padding:8px; border:1px solid #ccc;"><option>全部模式</option><option>按趟</option><option>按重量</option></select>
+            <select style="padding:8px; border:1px solid #ccc;"><option>全部状态</option><option>待结算</option><option>已结算</option></select>
+            <button class="btn-primary">查询</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>短途批次号</th><th>配送区域/时间</th><th>司机/车辆</th>
+                    <th>工作量 (票/重)</th><th>计费模式</th>
+                    <th style="text-align:right;">应付总额 (含杂费)</th><th>状态</th><th>操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <div style="margin-top:10px; color:#999; font-size:12px;">
+            * 提示：短途运费通常包含 <b>基础运费 + 多点费 + 上楼费</b>。
+        </div>
+    `;
+  }
+
+  // =========================================================================
+  // 6.1 短途批次详情页 (SettlementShortHaulDetail) - [新增]
+  // =========================================================================
+  else if (moduleCode === "SettlementShortHaulDetail") {
+      const id = window.g_currentShortId;
+      const list = JSON.parse(sessionStorage.getItem('ShortBatches') || "[]");
+      const item = list.find(i => i.id === id);
+
+      if (!item) {
+          contentHTML += `<div style="padding:20px;"><h3>数据丢失</h3><button class="btn-primary" onclick="loadContent('SettlementShortHaul')">返回</button></div>`;
+      } else {
+          // 模拟该批次下的具体订单 (Waybills)
+          const mockOrders = [
+              { no: "YD001", addr: "南京路步行街1号", w: 50, vol: 0.2, fee: "-" },
+              { no: "YD002", addr: "陆家嘴金融中心", w: 120, vol: 0.5, fee: "-" },
+              { no: "YD003", addr: "张江高科园区", w: 80, vol: 0.3, fee: "-" }
+          ].map(o => `
+              <tr>
+                  <td>${o.no}</td>
+                  <td>${o.addr}</td>
+                  <td>${o.w} kg</td>
+                  <td>${o.vol} m³</td>
+                  <td style="color:#999;">(合并计费)</td>
+              </tr>
+          `).join('');
+
+          const fees = item.fees;
+          
+          contentHTML += `
+            <div style="margin-bottom:20px;">
+                <button class="btn-primary" style="background:#95a5a6; padding:5px 15px;" onclick="loadContent('SettlementShortHaul')"> < 返回列表</button>
+                <h2 style="display:inline-block; margin-left:15px; vertical-align:middle;">短途详情：<span style="color:#2980b9;">${item.id}</span></h2>
+            </div>
+
+            <div style="display:flex; gap:20px;">
+                <div style="flex:2; background:white; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                    <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📦 配送任务清单 (${item.workload.count}票)</h3>
+                    <table class="data-table" style="font-size:13px;">
+                        <thead><tr><th>运单号</th><th>收货地址</th><th>重量</th><th>体积</th><th>分摊运费</th></tr></thead>
+                        <tbody>
+                            ${mockOrders}
+                            <tr><td colspan="5" style="text-align:center; color:#999;">... (此处省略其余订单) ...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="flex:1; height:fit-content; background:white; padding:20px; border-radius:8px; border-top:4px solid #2980b9; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                     <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin-top:0;">💰 费用结算</h3>
+                        <span style="padding:4px 8px; border-radius:4px; font-size:12px; ${item.status==='已结算'?'background:#e6f7ff;color:#2980b9':'background:#fff7e6;color:#e67e22'}">
+                            ${item.status}
+                        </span>
+                    </div>
                     
-                    <div class="filter-area" style="background:white; padding:15px; margin-bottom:20px; border-radius:6px;">
-                        <div style="display:flex; gap:10px;">
-                            <select style="padding:8px; border:1px solid #ccc; border-radius:4px;">
-                                <option>任务类型 (全部)</option>
-                                <option>提货</option>
-                                <option>送货</option>
-                            </select>
-                            <input type="date" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
-                            <button class="btn-primary">查询</button>
-                            <button class="btn-primary" style="background-color:#27ae60; margin-left:auto;">一键批量计费</button>
-                        </div>
+                    <div style="margin-bottom:15px; font-size:14px; color:#555;">
+                        <div>计费模式：<b>${item.feeType}</b></div>
+                        <div>总工作量：<b>${item.workload.weight} kg / ${item.workload.count} 票</b></div>
                     </div>
 
                     <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>任务批次</th>
-                                <th>司机名称</th>
-                                <th>类型</th>
-                                <th>作业区域</th>
-                                <th>作业量</th>
-                                <th style="text-align:right;">结算金额</th>
-                                <th>状态</th>
-                                <th>操作</th>
+                        <thead><tr><th>费用项</th><th style="text-align:right">金额</th></tr></thead>
+                        <tbody>
+                            <tr><td>基础运费</td><td style="text-align:right; font-weight:bold;">${fees.base.toLocaleString()}</td></tr>
+                            <tr><td>多点提送费</td><td style="text-align:right;">${fees.multiPoint}</td></tr>
+                            <tr><td>上楼/搬运费</td><td style="text-align:right;">${fees.upstairs}</td></tr>
+                            <tr><td>其他</td><td style="text-align:right;">${fees.other}</td></tr>
+                            <tr style="font-weight:bold; background:#f9f9f9; border-top:2px solid #eee;">
+                                <td>合计</td>
+                                <td style="text-align:right; font-size:18px; color:#e74c3c;">${item.totalAmount.toLocaleString()}</td>
                             </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
+                        </tbody>
                     </table>
-                `;
+
+                    <div style="margin-top:30px; text-align:right;">
+                         ${item.status === '已结算' 
+                            ? `<button class="btn-primary" disabled style="background:#ccc;">已转应付</button>`
+                            : `<button class="btn-primary" style="background:#27ae60;" onclick="settleShortHaul('${item.id}')">发起结算</button>`
+                         }
+                    </div>
+                </div>
+            </div>
+          `;
+      }
   }
 
   // =========================================================================
@@ -1500,68 +1832,9 @@ function loadContent(moduleCode, element = null) {
                     </table>
                     <p style="margin-top: 15px; color: #7f8c8d;">* 图表区域（饼图或柱状图）可在此处展示。</p>
                 `;
-  } // =========================================================================
-  // 8. 供应商付款申请 (AP Payment Apply)
-  // =========================================================================
-  else if (moduleCode === "APPaymentApply") {
-    contentHTML += `
-                    <h2>供应商付款申请</h2>
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <input type="text" placeholder="申请单号 / 供应商名称" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
-                            <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="">审批状态 (全部)</option>
-                                <option>待提交</option>
-                                <option>审批中</option>
-                                <option>已批准</option>
-                                <option>已驳回</option>
-                            </select>
-                            <input type="date" placeholder="申请日期范围" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
-                            <button class="btn-primary">查询</button>
-                        </div>
-                    </div>
-                    
-                    <div class="action-bar" style="margin-bottom: 15px;">
-                        <button class="btn-primary" style="background-color: #27ae60;">+ 新增付款申请</button>
-                        <button class="btn-primary" style="background-color: #f39c12;">批量提交审批</button>
-                    </div>
-
-                    <h3>付款申请列表</h3>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>申请单号</th>
-                                <th>供应商名称</th>
-                                <th>申请金额 (RMB)</th>
-                                <th>用途/摘要</th>
-                                <th>创建日期</th>
-                                <th>状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>AP202511001</td>
-                                <td>甲承运商</td>
-                                <td>18,500.00</td>
-                                <td>干线运费结算</td>
-                                <td>2025-11-19</td>
-                                <td><span style="color: #f39c12;">审批中</span></td>
-                                <td><a href="#" style="color:#3498db;">查看/撤回</a></td>
-                            </tr>
-                            <tr>
-                                <td>AP202511002</td>
-                                <td>乙办公用品</td>
-                                <td>800.00</td>
-                                <td>日常办公采购</td>
-                                <td>2025-11-20</td>
-                                <td><span style="color: #27ae60;">已批准</span></td>
-                                <td><a href="#" style="color:#3498db;">查看/执行付款</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
   }
+  
+
 
   // =========================================================================
   // 9. 预付款单 (AP Prepayment)
@@ -1862,62 +2135,201 @@ function loadContent(moduleCode, element = null) {
   }
   
   
+// =========================================================================
+  // 22. 收款与付款执行 (FundExecution) - [UI不变，逻辑匹配]
   // =========================================================================
-  // 1. 客户资金账户 (FundCustomerAcct)
+  else if (moduleCode === "FundExecution") {
+    let vouchers = JSON.parse(sessionStorage.getItem('FinanceVouchers') || "[]");
+    // 过滤出收款单
+    const receipts = vouchers.filter(v => v.type === '收款');
+
+    const receiptRows = receipts.map(r => {
+        let statusHtml = "";
+        let actionHtml = "";
+
+        // ★★★ 状态显示逻辑 ★★★
+        if (r.status === '待审核') {
+            // 刚录入的收款单，需要审核
+            statusHtml = `<span style="color:#f39c12; font-weight:bold;">⏳ 待审核</span>`;
+            actionHtml = `<button class="btn-primary" style="padding:2px 8px; font-size:12px; background:#27ae60;" onclick="auditVoucher('${r.id}')">审核通过</button>`;
+        } 
+        else if (r.status === '已审核') {
+            // 审核过了，等待去客户账户充值使用
+            statusHtml = `<span style="color:#3498db; font-weight:bold;">🛡️ 已审核</span>`;
+            actionHtml = `<span style="color:#999; font-size:12px;">待关联充值</span>`;
+        } 
+        else if (r.status === '已入账') {
+            // 已经充值完了，闭环
+            statusHtml = `<span style="color:#27ae60; font-weight:bold;">✔ 已入账</span>`;
+            actionHtml = `<span style="color:#ccc; font-size:12px;">流程结束</span>`;
+        }
+
+        return `
+            <tr>
+                <td>${r.id}</td>
+                <td>${r.date}</td>
+                <td>${r.target}</td>
+                <td style="text-align:right; font-weight:bold;">${r.amount.toLocaleString()}</td>
+                <td>${r.method}</td>
+                <td>${statusHtml}</td>
+                <td>${actionHtml}</td>
+            </tr>
+        `;
+    }).join('');
+
+    contentHTML += `
+        <h2>出纳执行台 / 凭证录入 (Cashier Desk)</h2>
+        <div style="background:#e8f8f5; padding:10px; border-radius:4px; margin-bottom:15px; border:1px solid #27ae60;">
+            <b>当前流程：</b> 1.录入收款单(待审核) -> 2.点击审核(已审核) -> 3.去客户资金账户关联充值
+        </div>
+
+        <div style="margin-bottom:20px;">
+            <button class="btn-primary" onclick="showVoucherForm('receipt')">➕ 新增收款凭证</button>
+        </div>
+
+        <div style="background:white; padding:15px; border-radius:8px; border-top:4px solid #27ae60; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+            <h3 style="margin-top:0;">📥 收款凭证列表</h3>
+            <table class="data-table">
+                <thead><tr><th>凭证号</th><th>日期</th><th>付款方</th><th>金额</th><th>方式</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody>${receiptRows || '<tr><td colspan="7" style="text-align:center;color:#ccc">暂无记录</td></tr>'}</tbody>
+            </table>
+        </div>
+
+        <div id="voucherModal" style="display:none; position:fixed; top:20%; left:30%; width:40%; background:white; border:1px solid #ccc; padding:20px; box-shadow:0 5px 15px rgba(0,0,0,0.2); z-index:100;">
+            <h3 style="color:#27ae60">录入收款凭证</h3>
+            <div style="margin-bottom:10px;">
+                <label>付款方摘要：</label>
+                <input type="text" id="v_target" placeholder="例如：京东物流打款" style="width:100%; padding:5px;">
+            </div>
+            <div style="margin-bottom:10px;">
+                <label>凭证金额：</label>
+                <input type="number" id="v_amount" placeholder="0.00" style="width:100%; padding:5px;">
+            </div>
+            <div style="text-align:right; margin-top:20px;">
+                <button onclick="document.getElementById('voucherModal').style.display='none'">取消</button>
+                <button class="btn-primary" onclick="submitVoucher()">提交</button>
+            </div>
+            <input type="hidden" id="v_type" value="receipt">
+        </div>
+    `;
+  }
+
+  // =========================================================================
+  // 19. 客户资金账户 (FundCustomerAcct) - [读取已审核数据]
   // =========================================================================
   else if (moduleCode === "FundCustomerAcct") {
-    contentHTML += `
-                    <h2>客户资金账户</h2>
-                    <p style="color: #7f8c8d;">管理客户的预存资金账户和保证金，用于直接结算运费。</p>
-                    
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <input type="text" placeholder="客户名称/账户ID" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
-                            <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="">账户状态</option>
-                                <option>正常</option>
-                                <option>冻结</option>
-                            </select>
-                            <button class="btn-primary">查询</button>
-                            <button class="btn-primary" style="background-color: #27ae60;">+ 新增资金账户</button>
-                        </div>
-                    </div>
+    let accounts = JSON.parse(sessionStorage.getItem('CustomerAccounts') || "[]");
+    
+    // 初始化账户数据 (保持不变)
+    if (accounts.length === 0) {
+        accounts = [
+            { id: "C001", name: "京东物流", balance: 50000, credit: 100000, lastUpdate: "2025-11-20" },
+            { id: "C002", name: "顺丰速运", balance: 12000, credit: 50000, lastUpdate: "2025-11-22" }
+        ];
+        sessionStorage.setItem('CustomerAccounts', JSON.stringify(accounts));
+    }
 
-                    <h3>资金账户列表</h3>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>账户ID</th>
-                                <th>客户名称</th>
-                                <th>账户类型</th>
-                                <th>当前余额 (RMB)</th>
-                                <th>最近变动时间</th>
-                                <th>状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>CFA1001</td>
-                                <td>阳光制造</td>
-                                <td>预存账户</td>
-                                <td><strong style="color: #2980b9;">50,000.00</strong></td>
-                                <td>2025-11-20 09:30</td>
-                                <td>正常</td>
-                                <td><a href="#" style="color:#3498db;">充值/扣款</a> | <a href="#" style="color:#2980b9;">流水</a></td>
-                            </tr>
-                            <tr>
-                                <td>CFA1002</td>
-                                <td>易达物流</td>
-                                <td>保证金</td>
-                                <td><strong style="color: #f39c12;">10,000.00</strong></td>
-                                <td>2025-10-01</td>
-                                <td>正常</td>
-                                <td><a href="#" style="color:#3498db;">调整</a> | <a href="#" style="color:#e74c3c;">冻结</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
+    // ★★★★★ 核心修复开始 ★★★★★
+    
+    // 1. 读取出纳系统的凭证 (FinanceVouchers)
+    let cashierVouchers = JSON.parse(sessionStorage.getItem('FinanceVouchers') || "[]");
+    
+    // 2. 读取会计系统的凭证 (ManualVouchers) - 就是你截图里那个列表
+    let financeVouchers = JSON.parse(sessionStorage.getItem('ManualVouchers') || "[]");
+
+    // 3. 合并并筛选
+    let availableVouchers = [];
+
+    // 筛选出纳凭证 (条件：类型=收款 且 状态=已审核)
+    cashierVouchers.forEach(v => {
+        if (v.type === '收款' && v.status === '已审核') {
+            // 统一数据格式，因为两边的字段可能略有不同
+            availableVouchers.push({
+                id: v.id,
+                amount: v.amount,
+                target: v.target || "未知付款方",
+                sourceType: "出纳台"
+            });
+        }
+    });
+
+    // 筛选会计凭证 (条件：类型包含"收款" 且 状态=已审核或已记账)
+    financeVouchers.forEach(v => {
+        // voucher.js 保存的 type 可能是 "收款凭证"，所以用 includes 判断
+        // status 可能是 "已审核" 或 "已记账"
+        const isReceipt = v.type && v.type.includes('收款'); 
+        const isAudited = v.status === '已审核' || v.status === '已记账';
+
+        if (isReceipt && isAudited) {
+             // 这里的 v.target 在会计凭证里可能没有，需要用摘要(lines[0].summary)代替
+             const summary = (v.lines && v.lines[0]) ? v.lines[0].summary : "手动凭证";
+             availableVouchers.push({
+                id: v.id,
+                amount: v.amount, // 注意：ManualVouchers存的是字符串，可能需要 parseFloat，但显示时字符串也行
+                target: summary,
+                sourceType: "会计端"
+            });
+        }
+    });
+
+    // ★★★★★ 核心修复结束 ★★★★★
+
+    let voucherOptions = `<option value="">-- 请选择关联的收款凭证 --</option>`;
+    availableVouchers.forEach(v => {
+        // data-amount 用于后续校验
+        voucherOptions += `<option value="${v.id}" data-amount="${v.amount}">[${v.sourceType}] ${v.id} | ¥${v.amount} | ${v.target}</option>`;
+    });
+
+    const rows = accounts.map(acc => `
+        <tr>
+            <td>${acc.id}</td>
+            <td><b>${acc.name}</b></td>
+            <td style="text-align:right; font-size:16px; color:#27ae60; font-weight:bold;">${acc.balance.toLocaleString()}</td>
+            <td>${acc.lastUpdate}</td>
+            <td>
+                <button class="btn-primary" style="padding:2px 8px; background:#f39c12;" onclick="openTopUpVerifyModal('${acc.id}', '${acc.name}')">充值入账</button>
+            </td>
+        </tr>
+    `).join('');
+
+    contentHTML += `
+        <h2>客户资金账户 (Customer Fund Accounts)</h2>
+        <div style="background:#e8f8f5; padding:10px; border-radius:4px; margin-bottom:15px; border:1px solid #27ae60;">
+            <b>关联说明：</b> 只有在【出纳台】<b>审核通过</b>的收款凭证，才会显示在下方的充值选项中。
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>客户编码</th><th>客户名称</th><th style="text-align:right;">当前余额</th><th>最后变动</th><th>操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+
+        <div id="topUpModal" style="display:none; position:fixed; top:20%; left:30%; width:40%; background:white; border:1px solid #ccc; padding:20px; box-shadow:0 5px 15px rgba(0,0,0,0.2); z-index:100;">
+            <h3 style="color:#f39c12;">💰 客户充值 (资金入账)</h3>
+            <p>正在为客户：<b id="tu_customer_name" style="font-size:16px;"></b> 充值</p>
+            <input type="hidden" id="tu_customer_id">
+
+            <div style="margin-bottom:15px; background:#f9f9f9; padding:10px; border-radius:4px;">
+                <label style="display:block; margin-bottom:5px; color:#666;">1. 关联资金凭证 (必选)：</label>
+                <select id="tu_voucher_select" style="width:100%; padding:8px; border:1px solid #ddd;" onchange="autoFillAmount(this)">
+                    ${availableVouchers.length > 0 ? voucherOptions : '<option value="">(无可用凭证，请先去审核)</option>'}
+                </select>
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label style="display:block; margin-bottom:5px; color:#666;">2. 确认入账金额 (必须与凭证一致)：</label>
+                <input type="number" id="tu_input_amount" placeholder="请手动输入金额以进行核对" style="width:100%; padding:8px; border:1px solid #ddd;">
+            </div>
+
+            <div style="text-align:right; margin-top:20px;">
+                <button onclick="document.getElementById('topUpModal').style.display='none'">取消</button>
+                <button class="btn-primary" onclick="performTopUp()">校验并充值</button>
+            </div>
+        </div>
+    `;
   }
 
   // =========================================================================
@@ -2033,71 +2445,7 @@ function loadContent(moduleCode, element = null) {
                 `;
   }
 
-  // =========================================================================
-  // 4. 收款与付款执行 (FundExecution)
-  // =========================================================================
-  else if (moduleCode === "FundExecution") {
-    contentHTML += `
-                    <h2>收款与付款执行 (任务中心)</h2>
-                    <p style="color: #7f8c8d;">集中管理和执行待处理的收款任务（如代收货款清分）和付款任务（如司机酬金支付）。</p>
-                    
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <input type="text" placeholder="任务编号/关联单据号" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
-                            <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="">任务类型</option>
-                                <option>收款清分</option>
-                                <option>批量支付</option>
-                                <option>提现支付</option>
-                            </select>
-                            <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="">执行状态</option>
-                                <option>待执行</option>
-                                <option>执行中</option>
-                                <option>成功</option>
-                                <option>失败</option>
-                            </select>
-                            <button class="btn-primary">查询</button>
-                            <button class="btn-primary" style="background-color: #27ae60;">批量执行</button>
-                        </div>
-                    </div>
 
-                    <h3>执行任务列表</h3>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>任务ID</th>
-                                <th>任务类型</th>
-                                <th>总金额 (RMB)</th>
-                                <th>单据/笔数</th>
-                                <th>提交时间</th>
-                                <th>状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>FE20251120-001</td>
-                                <td>批量支付 (酬金)</td>
-                                <td>15,500.00</td>
-                                <td>15笔</td>
-                                <td>2025-11-20 10:00</td>
-                                <td><span style="color: #f39c12;">待执行</span></td>
-                                <td><a href="#" style="color:#27ae60;">执行</a> | <a href="#" style="color:#3498db;">详情</a></td>
-                            </tr>
-                            <tr>
-                                <td>FE20251119-005</td>
-                                <td>收款清分 (代收)</td>
-                                <td>35,000.00</td>
-                                <td>200笔</td>
-                                <td>2025-11-19 14:00</td>
-                                <td><span style="color: #27ae60;">成功</span></td>
-                                <td><a href="#" style="color:#3498db;">查看日志</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-  }
 
   // =========================================================================
   // 5. 银企直联 (FundBankConnect)
@@ -6217,7 +6565,7 @@ function loadContent(moduleCode, element = null) {
                         <div style="margin-left:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                             <label><input type="checkbox" class="perm-chk" value="dashboard" ${isChecked('dashboard')}> 经营仪表盘</label>
                             <label><input type="checkbox" class="perm-chk" value="report" ${isChecked('report')}> 三大财务报表</label>
-                            <label><input type="checkbox" class="perm-chk" value="setup" ${isChecked('setup')}> 基础设置</label>
+                            
                             <label><input type="checkbox" class="perm-chk" value="log" ${isChecked('log')}> 操作日志</label>
                         </div>
                     </div>
@@ -7088,6 +7436,7 @@ function loadContent(moduleCode, element = null) {
                     </table>
                 `;
   }
+
 
   // =========================================================================
   // 46. 利润损益表 (ReportIncomeStatement) - [智能识别版]
