@@ -629,3 +629,378 @@ window.auditVoucher = function(id) {
         loadContent('FundExecution'); // 刷新页面
     }
 }
+
+
+// ============================================
+// 异动管理 (Abnormal Management) 业务逻辑
+// ============================================
+
+/**
+ * 1. 打开定责弹窗
+ * @param {string} id 异动事件ID
+ */
+window.openAbnormalModal = function(id) {
+    document.getElementById('modal_abnormal_id').value = id;
+    // 重置表单，清空旧数据
+    document.getElementById('modal_target_name').value = '';
+    document.getElementById('modal_amount').value = '';
+    document.getElementById('modal_remark').value = '';
+    document.getElementById('abnormalModal').style.display = 'block';
+}
+
+/**
+ * 2. 确认定责 -> 并在【财务挂账】模块生成数据
+ */
+window.confirmAbnormalLiability = function() {
+    // 1. 获取输入数据
+    const id = document.getElementById('modal_abnormal_id').value;
+    const targetType = document.getElementById('modal_target_type').value;
+    const targetName = document.getElementById('modal_target_name').value;
+    const amountStr = document.getElementById('modal_amount').value;
+    const remark = document.getElementById('modal_remark').value;
+
+    if (!targetName || !amountStr) {
+        alert("❌ 请填写完整的责任人名称和金额！");
+        return;
+    }
+    
+    const amount = parseFloat(amountStr);
+    if(amount <= 0) {
+         alert("❌ 金额必须大于 0！");
+         return;
+    }
+
+    // 2. 更新【异动管理】(AbnormalEvents) 的状态 -> 变更为“已结案”
+    let abnList = JSON.parse(sessionStorage.getItem('AbnormalEvents') || "[]");
+    let abnItem = abnList.find(i => i.id === id);
+    if (abnItem) {
+        abnItem.status = "已结案";
+        abnItem.result = `[${targetType}] ${targetName} 赔付 ¥${amount}`;
+        sessionStorage.setItem('AbnormalEvents', JSON.stringify(abnList));
+    }
+
+    // 3. ★★★ 关键步骤：写入【财务挂账】(PendingAbnormals) ★★★
+    // 这一步实现了数据从“业务端”流转到“财务端”
+    let financeList = JSON.parse(sessionStorage.getItem('PendingAbnormals') || "[]");
+    
+    // 构造新的挂账单
+    const newPending = {
+        id: "GZ" + new Date().getTime().toString().slice(-6), // 自动生成挂账单号
+        sourceId: id,            // 来源：原来的异动编号
+        sourceModule: "异动管理", // 来源模块
+        type: abnItem ? abnItem.type : "异动赔款", // 类型：货损/延误等
+        target: targetName,      // 挂账对象 (谁欠钱)
+        targetType: targetType,  // 对象类型 (司机/网点)
+        amount: amount,          // 金额
+        date: new Date().toISOString().split('T')[0],
+        status: "待核销",        // 初始财务状态
+        remark: remark || "业务定责自动生成"
+    };
+
+    financeList.unshift(newPending);
+    sessionStorage.setItem('PendingAbnormals', JSON.stringify(financeList));
+
+    // 4. 提示与刷新
+    alert(`✅ 定责成功！\n\n1. 异动记录已结案。\n2. 已自动在【财务挂账】生成应收款单据：${newPending.id}\n金额：¥${amount}`);
+    
+    document.getElementById('abnormalModal').style.display = 'none';
+    loadContent('AbnormalManagement'); // 刷新当前页面
+}
+
+
+
+// ============================================
+// 异动管理 (Abnormal Management) - 财务端逻辑
+// ============================================
+
+/**
+ * 1. 打开财务登记弹窗
+ * @param {string} id 异动ID
+ */
+window.openAbnormalBookModal = function(id) {
+    let list = JSON.parse(sessionStorage.getItem('AbnormalEvents') || "[]");
+    let item = list.find(i => i.id === id);
+    if (!item) return;
+
+    document.getElementById('modal_abnormal_id').value = id;
+    
+    // 填充只读信息 (业务部门的结论)
+    document.getElementById('modal_ops_result_display').innerText = item.opsResult;
+    
+    // 默认填入业务建议的金额，供财务确认
+    document.getElementById('modal_amount').value = item.suggestAmount;
+    document.getElementById('modal_remark').value = "";
+    
+    document.getElementById('abnormalModal').style.display = 'block';
+}
+
+/**
+ * 2. 确认入账
+ */
+window.confirmAbnormalBooking = function() {
+    const id = document.getElementById('modal_abnormal_id').value;
+    const action = document.getElementById('modal_fin_action').value;
+    const amount = document.getElementById('modal_amount').value;
+    const remark = document.getElementById('modal_remark').value;
+
+    if (!amount) {
+        alert("❌ 请确认金额！");
+        return;
+    }
+
+    // 更新数据
+    let list = JSON.parse(sessionStorage.getItem('AbnormalEvents') || "[]");
+    let item = list.find(i => i.id === id);
+    
+    if (item) {
+        item.status = "已入账";
+        // 记录财务的操作
+        item.finRemark = `${action} ¥${amount} (${remark || '无备注'})`;
+        
+        sessionStorage.setItem('AbnormalEvents', JSON.stringify(list));
+        
+        // 这一步你可以选择是否生成具体的挂账单，或者仅仅是更新状态
+        // 这里演示简单的状态更新，符合“只做记账”的需求
+        alert(`✅ 入账成功！\n\n异动单：${id}\n处理方式：${action}\n金额：${amount}\n\n该记录已在财务系统归档。`);
+        
+        document.getElementById('abnormalModal').style.display = 'none';
+        loadContent('AbnormalManagement'); // 刷新页面
+    }
+}
+
+
+
+// ============================================
+// 异动登记 (Abnormal Registration) - 业务端逻辑
+// ============================================
+
+// 1. 打开录入弹窗
+window.openRegisterModal = function() {
+    // 清空表单
+    document.getElementById('reg_waybill').value = "";
+    document.getElementById('reg_liability').value = "";
+    document.getElementById('reg_amount').value = "";
+    document.getElementById('reg_desc').value = "";
+    
+    // 显示弹窗
+    document.getElementById('registerModal').style.display = 'block';
+}
+
+// 2. 保存新异动
+window.saveNewAbnormal = function() {
+    // 获取输入值
+    const waybill = document.getElementById('reg_waybill').value;
+    const type = document.getElementById('reg_type').value;
+    const liability = document.getElementById('reg_liability').value;
+    const amountStr = document.getElementById('reg_amount').value;
+    const desc = document.getElementById('reg_desc').value;
+
+    // 简单校验
+    if (!waybill || !liability || !amountStr) {
+        alert("❌ 请填写完整的：运单号、责任判定和金额！");
+        return;
+    }
+
+    const amount = parseFloat(amountStr);
+
+    // 读取旧数据
+    let list = JSON.parse(sessionStorage.getItem('AbnormalEvents') || "[]");
+
+    // 创建新数据对象
+    const newItem = {
+        id: "YC" + new Date().getTime().toString().slice(-6), // 自动生成编号
+        date: new Date().toISOString().split('T')[0],
+        waybill: waybill,
+        type: type,
+        desc: desc,
+        reporter: "运营部-当前用户", // 模拟当前登录人
+        
+        // 关键字段：传给财务看的
+        opsResult: liability + `，金额 ${amount}元`, 
+        suggestAmount: amount,
+        
+        status: "待入账" // 初始状态
+    };
+
+    // 保存到缓存
+    list.unshift(newItem);
+    sessionStorage.setItem('AbnormalEvents', JSON.stringify(list));
+
+    // 提示成功
+    alert(`✅ 录入成功！\n\n异动编号：${newItem.id}\n责任判定：${liability}\n\n该记录已推送至财务部门。`);
+
+    // 关闭弹窗并刷新
+    document.getElementById('registerModal').style.display = 'none';
+    loadContent('AbnormalManagement');
+}
+
+
+// ============================================
+// 收支方式配置 (Payment Methods) 逻辑
+// ============================================
+
+// 1. 打开弹窗
+window.openPaymentMethodModal = function() {
+    document.getElementById('pm_name').value = "";
+    document.getElementById('pm_type').value = "银行账户";
+    document.getElementById('pmModal').style.display = 'block';
+}
+
+// 2. 保存新方式
+window.savePaymentMethod = function() {
+    const name = document.getElementById('pm_name').value;
+    const type = document.getElementById('pm_type').value;
+
+    if (!name) return alert("❌ 请填写名称！");
+
+    let list = JSON.parse(sessionStorage.getItem('ConfigPaymentMethods') || "[]");
+    
+    const newItem = {
+        id: "PM" + new Date().getTime().toString().slice(-4), // 简单生成ID
+        name: name,
+        type: type,
+        status: "启用"
+    };
+
+    list.push(newItem);
+    sessionStorage.setItem('ConfigPaymentMethods', JSON.stringify(list));
+
+    alert("✅ 保存成功！");
+    document.getElementById('pmModal').style.display = 'none';
+    loadContent('PaymentMethodConfig'); // 刷新页面
+}
+
+// 3. 切换状态 (启用/停用)
+window.toggleMethodStatus = function(id) {
+    let list = JSON.parse(sessionStorage.getItem('ConfigPaymentMethods') || "[]");
+    let item = list.find(i => i.id === id);
+    if (item) {
+        item.status = item.status === '启用' ? '停用' : '启用';
+        sessionStorage.setItem('ConfigPaymentMethods', JSON.stringify(list));
+        loadContent('PaymentMethodConfig'); // 刷新
+    }
+}
+
+// 4. 删除方式
+window.deleteMethod = function(id) {
+    if(!confirm("确定要删除该收支方式吗？删除后可能影响历史数据的显示。")) return;
+    
+    let list = JSON.parse(sessionStorage.getItem('ConfigPaymentMethods') || "[]");
+    const newList = list.filter(i => i.id !== id);
+    
+    sessionStorage.setItem('ConfigPaymentMethods', JSON.stringify(newList));
+    loadContent('PaymentMethodConfig'); // 刷新
+}
+
+
+
+
+// 文件名: settlement.js
+
+class SettlementSystem {
+    constructor() {
+
+        // 模拟数据库/后端存储的配置
+        this.accountingRules = []; // 会计引擎规则（借方）
+        this.paymentMethods = [    // 收支方式（贷方 - 你的分离配置）
+            { id: 'pm_wx', name: '微信支付', subjectCode: '1012.01', subjectName: '其他货币资金_微信' },
+            { id: 'pm_bank', name: '银行卡转账', subjectCode: '1002.01', subjectName: '银行存款_工行' },
+            { id: 'pm_debt', name: '挂账/应付', subjectCode: '2202.01', subjectName: '应付账款_运费' },
+            { id: 'pm_internal', name: '总部代付', subjectCode: '2241.01', subjectName: '内部往来_总部' } // 支持内部往来
+        ]; 
+
+
+        // --- 1. 模拟配置数据 (对应你那四个模块的配置) ---
+        
+        // 模块A: 记账规则 (Booking Rules)
+        // 逻辑：如果单据满足 condition，就使用 scenarioId 对应的模板
+        this.bookingRules = [
+            { id: 'rule_1', condition: (doc) => doc.type === '运单' && doc.paymentType === '现付' && doc.status === '已签收', scenarioId: '现付挂账' },
+            { id: 'rule_2', condition: (doc) => doc.type === '运单' && doc.paymentType === '月结' && doc.status === '已签收', scenarioId: '月结挂账' },
+            { id: 'rule_3', condition: (doc) => doc.type === '运单' && doc.status === '已结算', scenarioId: '现付结算' } // 结算类
+        ];
+
+        // 模块B: 自动分录模板 (Entry Templates) - 你的 ACCOUNTING_SCENARIOS
+        this.scenarios = {
+            '现付挂账': {
+                name: "现付挂账",
+                type: "ACCRUAL", // 挂账类
+                debit: { subject: "1122", name: "应收账款", aux: ["customer"] }, // 需要客商辅助核算
+                credit: { subject: "6001", name: "主营业务收入", aux: ["department"] },
+                abstractTemplate: "运单{bill_no}现付挂账" // 摘要模板
+            },
+            '月结挂账': {
+                name: "月结挂账",
+                type: "ACCRUAL",
+                debit: { subject: "1122", name: "应收账款", aux: ["customer"] },
+                credit: { subject: "6001", name: "主营业务收入", aux: ["department"] },
+                abstractTemplate: "运单{bill_no}月结确认收入"
+            },
+            '现付结算': {
+                name: "现付结算",
+                type: "SETTLEMENT", // 结算类 (分离模式)
+                debit: { subject: "1001", name: "库存现金", aux: [] }, 
+                credit: null, // 贷方为空，等待收支方式填充
+                abstractTemplate: "收运单{bill_no}运费"
+            }
+        };
+
+        // 模块C: 业务单据映射 (Data Mapping)
+        // 逻辑：模板里的 {key} 对应单据里的哪个字段
+        this.fieldMapping = {
+            'bill_no': 'waybillNo',     // {bill_no} -> doc.waybillNo
+            'customer': 'clientName',   // 辅助核算取 doc.clientName
+            'department': 'orgName'     // 辅助核算取 doc.orgName
+        };
+
+        // 模块D: 收支方式 (用于结算类)
+        this.paymentMethods = [
+            { id: 'pm_wx', name: '微信', subject: '1012.01', subjectName: '其他货币资金-微信' },
+            { id: 'pm_cash', name: '现金', subject: '1001', subjectName: '库存现金' }
+        ];
+    }
+
+
+
+}
+
+
+// view_manager.js
+
+window.runEngineDemo = function() {
+    // 1. 收集表单数据 (保持不变)
+    const doc = {
+        waybillNo: document.getElementById('demo_waybillNo').value,
+        paymentType: document.getElementById('demo_paymentType').value, // 现付/月结
+        status: document.getElementById('demo_status').value, // 已签收/已结算
+        amount: parseFloat(document.getElementById('demo_amount').value) || 0
+    };
+    const pmId = document.getElementById('demo_pmId').value;
+
+    // 2. 调用新引擎 (使用 SettlementEngine 对象)
+    if (!window.SettlementEngine) {
+        return alert("❌ 引擎 settlement.js 未加载");
+    }
+
+    const result = window.SettlementEngine.generateVoucher(doc, pmId);
+
+    // 3. 渲染结果 (保持不变，略...)
+    const logContainer = document.getElementById('engine_logs');
+    logContainer.innerHTML = result.logs.map(log => `<div>${log}</div>`).join('');
+    
+    // ... 渲染表格代码同上 ...
+    // 如果有 result.voucher.entries 就渲染表格
+    if(result.success) {
+        let rows = result.voucher.entries.map(e => `
+            <tr>
+                <td>${e.digest}</td>
+                <td>${e.code}</td>
+                <td style="color:green">${e.debit || ''}</td>
+                <td style="color:red">${e.credit || ''}</td>
+            </tr>
+        `).join('');
+        document.getElementById('voucher_result').innerHTML = `<table border="1" width="100%">${rows}</table>`;
+    } else {
+        document.getElementById('voucher_result').innerHTML = result.error;
+    }
+};

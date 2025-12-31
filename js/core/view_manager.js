@@ -25,9 +25,12 @@ function getModuleName(code) {
     FundEnergyAcct: "能源账户管理",
     FundWallet: "司机/网点钱包",
     FundExecution: "收款与付款执行",
-    FundBankConnect: "银企直联",
-    FundClearingRule: "清分与分账规则",
+    // FundBankConnect: "银企直联",
+    //FundClearingRule: "清分与分账规则",
     ExpenseLoan: "借款单",
+
+    // ★★★ 在这里添加这一行 ★★★
+    SettlementEngineConfig: "会计引擎配置",
     ExpenseRepay: "还款单",
     ExpenseDaily: "日常费用报销",
     ExpenseTravel: "差旅报销",
@@ -51,6 +54,7 @@ function getModuleName(code) {
     AcctRule: "记账规则",
     AssetCard: "资产卡片",
     AssetDepreciation: "折旧计算",
+    PaymentMethodConfig: "收支方式配置",
     AssetChange: "资产变动",
     VoucherEntryReview: "凭证录入",
     VoucherQueryPrint: "凭证查询/审核",
@@ -716,8 +720,6 @@ function loadContent(moduleCode, element = null) {
     `;
 
 }
-
-
 
 
 // =========================================================================
@@ -2295,7 +2297,7 @@ function loadContent(moduleCode, element = null) {
     contentHTML += `
         <h2>客户资金账户 (Customer Fund Accounts)</h2>
         <div style="background:#e8f8f5; padding:10px; border-radius:4px; margin-bottom:15px; border:1px solid #27ae60;">
-            <b>关联说明：</b> 只有在【出纳台】<b>审核通过</b>的收款凭证，才会显示在下方的充值选项中。
+            
         </div>
 
         <table class="data-table">
@@ -2446,186 +2448,113 @@ function loadContent(moduleCode, element = null) {
   }
 
 
-
-  // =========================================================================
-  // 5. 银企直联 (FundBankConnect)
-  // =========================================================================
-  else if (moduleCode === "FundBankConnect") {
-    contentHTML += `
-                    <h2>银企直联接口监控</h2>
-                    <p style="color: #7f8c8d;">监控与银行系统的接口连接状态、自动对账和支付指令发送情况。</p>
-                    
-                    <div class="dashboard-grid">
-                        <div class="kpi-card" style="padding: 15px;">
-                            <div class="kpi-title">当前连接状态</div>
-                            <div class="kpi-value" style="font-size: 28px; color: #27ae60;">✅ 运行正常</div>
-                        </div>
-                         <div class="kpi-card" style="padding: 15px;">
-                            <div class="kpi-title">待发送支付指令数</div>
-                            <div class="kpi-value" style="font-size: 28px; color: #f39c12;">12 笔</div>
-                        </div>
-                        <div class="kpi-card" style="padding: 15px;">
-                            <div class="kpi-title">今日自动对账成功率</div>
-                            <div class="kpi-value" style="font-size: 28px; color: #2980b9;">98.5%</div>
-                        </div>
-                    </div>
-                    
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="">交易类型</option>
-                                <option>余额查询</option>
-                                <option>单笔支付</option>
-                                <option>批量支付</option>
-                                <option>回单查询</option>
-                            </select>
-                            <input type="date" placeholder="交易日期" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                            <button class="btn-primary">查询交易日志</button>
-                            <button class="btn-primary" style="background-color: #34495e;">查看银行账户配置</button>
-                        </div>
-                    </div>
-                    
-                    <h3>银企交易日志</h3>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>交易流水号</th>
-                                <th>交易类型</th>
-                                <th>金额 (RMB)</th>
-                                <th>交易时间</th>
-                                <th>状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>BKTRX251120-101</td>
-                                <td>批量支付</td>
-                                <td>-15,500.00</td>
-                                <td>2025-11-20 10:15</td>
-                                <td><span style="color: #27ae60;">成功</span></td>
-                                <td><a href="#" style="color:#3498db;">查回单</a></td>
-                            </tr>
-                            <tr>
-                                <td>BKTRX251120-102</td>
-                                <td>余额查询</td>
-                                <td>-</td>
-                                <td>2025-11-20 10:18</td>
-                                <td><span style="color: #c0392b;">失败</span></td>
-                                <td><a href="#" style="color:#e74c3c;">查看详情</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-  }
-
   // =========================================================================
   // 6. 清分与分账规则 (FundClearingRule)
   // =========================================================================
-  else if (moduleCode === "FundClearingRule") {
-    contentHTML += `
-                    <h2>清分与分账规则配置</h2>
-                    <p style="color: #7f8c8d;">配置自动将收款资金按预定比例和条件分配给网点、承运商或平台的规则。</p>
+//   else if (moduleCode === "FundClearingRule") {
+//     contentHTML += `
+//                     <h2>清分与分账规则配置</h2>
+//                     <p style="color: #7f8c8d;">配置自动将收款资金按预定比例和条件分配给网点、承运商或平台的规则。</p>
                     
-                    <div class="action-bar" style="margin-bottom: 15px;">
-                        <button class="btn-primary" style="background-color: #27ae60;">+ 新增清分规则</button>
-                        <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-left: 10px;">
-                            <option value="">按业务场景筛选</option>
-                            <option>代收货款</option>
-                            <option>平台运费</option>
-                        </select>
-                    </div>
+//                     <div class="action-bar" style="margin-bottom: 15px;">
+//                         <button class="btn-primary" style="background-color: #27ae60;">+ 新增清分规则</button>
+//                         <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-left: 10px;">
+//                             <option value="">按业务场景筛选</option>
+//                             <option>代收货款</option>
+//                             <option>平台运费</option>
+//                         </select>
+//                     </div>
 
-                    <h3>分账规则列表</h3>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>规则名称</th>
-                                <th>业务场景</th>
-                                <th>分配目标</th>
-                                <th>清分公式</th>
-                                <th>状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>代收货款分润规则 V1.0</td>
-                                <td>代收货款</td>
-                                <td>网点, 平台</td>
-                                <td>代收金额*0.5%给网点，剩余归平台</td>
-                                <td><span style="color: #27ae60;">生效中</span></td>
-                                <td><a href="#" style="color:#3498db;">编辑</a> | <a href="#" style="color:#e74c3c;">停用</a></td>
-                            </tr>
-                            <tr>
-                                <td>平台运费分成 V1.2</td>
-                                <td>平台运费</td>
-                                <td>承运商, 平台</td>
-                                <td>承运商应付金额全额支付，应收余额归平台</td>
-                                <td><span style="color: #f39c12;">待审批</span></td>
-                                <td><a href="#" style="color:#3498db;">查看</a> | <a href="#" style="color:#27ae60;">审批</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-  } else if (moduleCode === "ExpenseLoan") {
-    contentHTML += `
-                    <h2>借款单</h2>
-                    <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <input type="text" placeholder="借款单号 / 申请人" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
-                            <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="">审批状态 (全部)</option>
-                                <option>待审批</option>
-                                <option>已批准</option>
-                                <option>已核销</option>
-                            </select>
-                            <input type="date" placeholder="借款日期范围" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
-                            <button class="btn-primary">查询</button>
-                        </div>
-                    </div>
+//                     <h3>分账规则列表</h3>
+//                     <table class="data-table">
+//                         <thead>
+//                             <tr>
+//                                 <th>规则名称</th>
+//                                 <th>业务场景</th>
+//                                 <th>分配目标</th>
+//                                 <th>清分公式</th>
+//                                 <th>状态</th>
+//                                 <th>操作</th>
+//                             </tr>
+//                         </thead>
+//                         <tbody>
+//                             <tr>
+//                                 <td>代收货款分润规则 V1.0</td>
+//                                 <td>代收货款</td>
+//                                 <td>网点, 平台</td>
+//                                 <td>代收金额*0.5%给网点，剩余归平台</td>
+//                                 <td><span style="color: #27ae60;">生效中</span></td>
+//                                 <td><a href="#" style="color:#3498db;">编辑</a> | <a href="#" style="color:#e74c3c;">停用</a></td>
+//                             </tr>
+//                             <tr>
+//                                 <td>平台运费分成 V1.2</td>
+//                                 <td>平台运费</td>
+//                                 <td>承运商, 平台</td>
+//                                 <td>承运商应付金额全额支付，应收余额归平台</td>
+//                                 <td><span style="color: #f39c12;">待审批</span></td>
+//                                 <td><a href="#" style="color:#3498db;">查看</a> | <a href="#" style="color:#27ae60;">审批</a></td>
+//                             </tr>
+//                         </tbody>
+//                     </table>
+//                 `;
+//   } else if (moduleCode === "ExpenseLoan") {
+//     contentHTML += `
+//                     <h2>借款单</h2>
+//                     <div class="filter-area" style="background-color: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
+//                         <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+//                             <input type="text" placeholder="借款单号 / 申请人" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
+//                             <select style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+//                                 <option value="">审批状态 (全部)</option>
+//                                 <option>待审批</option>
+//                                 <option>已批准</option>
+//                                 <option>已核销</option>
+//                             </select>
+//                             <input type="date" placeholder="借款日期范围" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+//                             <button class="btn-primary">查询</button>
+//                         </div>
+//                     </div>
                     
-                    <div class="action-bar" style="margin-bottom: 15px;">
-                        <button class="btn-primary" style="background-color: #27ae60;">+ 新增借款申请</button>
-                        <button class="btn-primary" style="background-color: #f39c12;">待审批 (3)</button>
-                    </div>
+//                     <div class="action-bar" style="margin-bottom: 15px;">
+//                         <button class="btn-primary" style="background-color: #27ae60;">+ 新增借款申请</button>
+//                         <button class="btn-primary" style="background-color: #f39c12;">待审批 (3)</button>
+//                     </div>
 
-                    <h3>借款单列表</h3>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>借款单号</th>
-                                <th>申请人/部门</th>
-                                <th>借款金额 (RMB)</th>
-                                <th>预计还款日</th>
-                                <th>状态</th>
-                                <th>已核销金额</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>JQ202511001</td>
-                                <td>李四 / 销售部</td>
-                                <td>5,000.00</td>
-                                <td>2025-12-30</td>
-                                <td><span style="color: #f39c12;">待审批</span></td>
-                                <td>0.00</td>
-                                <td><a href="#" style="color:#3498db;">查看/审批</a></td>
-                            </tr>
-                            <tr>
-                                <td>JQ202510002</td>
-                                <td>王五 / 运营部</td>
-                                <td>2,000.00</td>
-                                <td>2025-11-25</td>
-                                <td><span style="color: #27ae60;">已批准</span></td>
-                                <td>1,500.00</td>
-                                <td><a href="#" style="color:#3498db;">查看/核销</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-  }
+//                     <h3>借款单列表</h3>
+//                     <table class="data-table">
+//                         <thead>
+//                             <tr>
+//                                 <th>借款单号</th>
+//                                 <th>申请人/部门</th>
+//                                 <th>借款金额 (RMB)</th>
+//                                 <th>预计还款日</th>
+//                                 <th>状态</th>
+//                                 <th>已核销金额</th>
+//                                 <th>操作</th>
+//                             </tr>
+//                         </thead>
+//                         <tbody>
+//                             <tr>
+//                                 <td>JQ202511001</td>
+//                                 <td>李四 / 销售部</td>
+//                                 <td>5,000.00</td>
+//                                 <td>2025-12-30</td>
+//                                 <td><span style="color: #f39c12;">待审批</span></td>
+//                                 <td>0.00</td>
+//                                 <td><a href="#" style="color:#3498db;">查看/审批</a></td>
+//                             </tr>
+//                             <tr>
+//                                 <td>JQ202510002</td>
+//                                 <td>王五 / 运营部</td>
+//                                 <td>2,000.00</td>
+//                                 <td>2025-11-25</td>
+//                                 <td><span style="color: #27ae60;">已批准</span></td>
+//                                 <td>1,500.00</td>
+//                                 <td><a href="#" style="color:#3498db;">查看/核销</a></td>
+//                             </tr>
+//                         </tbody>
+//                     </table>
+//                 `;
+//   }
 
   // =========================================================================
   // 13. 还款单 (Expense Repay)
@@ -3004,6 +2933,125 @@ function loadContent(moduleCode, element = null) {
                         </tbody>
                     </table>
                 `;
+}
+
+// =========================================================================
+  // 11. 异动管理 (AbnormalManagement) - [业务端：异动登记台]
+  // =========================================================================
+  else if (moduleCode === "AbnormalManagement") {
+    
+    // 1. 初始化数据 (如果没有数据，给几条示例)
+    let list = JSON.parse(sessionStorage.getItem('AbnormalEvents') || "[]");
+    if (list.length === 0) {
+        list = [
+            { 
+                id: "YC2025120101", 
+                date: "2025-12-01", 
+                waybill: "YD10086", 
+                type: "货物破损", 
+                desc: "外包装破损，客户拒收", 
+                reporter: "客服部-王五", 
+                opsResult: "司机张三全责，赔付500元", // 定责结果
+                suggestAmount: 500,
+                status: "待入账" 
+            }
+        ];
+        sessionStorage.setItem('AbnormalEvents', JSON.stringify(list));
+    }
+
+    // 2. 渲染列表
+    const rows = list.map(item => {
+        let statusTag = "";
+        
+        if (item.status === '待入账') {
+            statusTag = `<span style="background:#fff7e6; color:#e67e22; padding:2px 8px; border-radius:4px; border:1px solid #ffe58f;">⏳ 等待财务入账</span>`;
+        } else {
+            statusTag = `<span style="background:#e8f8f5; color:#27ae60; padding:2px 8px; border-radius:4px; border:1px solid #a9dfbf;">✔ 财务已处理</span>`;
+        }
+
+        return `
+            <tr>
+                <td>${item.id}</td>
+                <td>${item.date}</td>
+                <td><b style="color:#2980b9;">${item.waybill}</b></td>
+                <td>${item.type}</td>
+                <td>${item.opsResult}</td> <td style="font-weight:bold; color:#c0392b;">${item.suggestAmount}</td>
+                <td>${item.reporter}</td>
+                <td>${statusTag}</td>
+            </tr>
+        `;
+    }).join('');
+
+    contentHTML += `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding-bottom:15px; border-bottom:1px solid #eee;">
+            <div>
+                <h2 style="margin:0; color:#2c3e50;">🚨 异动登记台 (Abnormal Registration)</h2>
+                <p style="margin:5px 0 0 0; color:#7f8c8d; font-size:13px;">业务部门使用：在此录入异常事件，并判定责任归属。保存后数据将自动推送到财务部。</p>
+            </div>
+            <div>
+                <button class="btn-primary" style="background:#e74c3c; padding:8px 20px; font-size:14px;" onclick="openRegisterModal()">+ 新增异动登记</button>
+            </div>
+        </div>
+
+        <div style="background:white; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); overflow:hidden;">
+            <table class="data-table" style="width:100%; border-collapse:collapse;">
+                <thead style="background:#f8f9fa;">
+                    <tr>
+                        <th>登记编号</th><th>登记日期</th><th>关联运单号</th><th>异常类型</th>
+                        <th style="width:25%;">定责结果 (责任方)</th>
+                        <th>涉及金额</th><th>登记人</th><th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+
+        <div id="registerModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999;">
+            <div style="position:absolute; top:10%; left:50%; transform:translateX(-50%); width:500px; background:white; border-radius:8px; box-shadow:0 5px 25px rgba(0,0,0,0.2);">
+                
+                <div style="padding:15px 20px; border-bottom:1px solid #eee; background:#f9f9f9; border-radius:8px 8px 0 0;">
+                    <h3 style="margin:0; color:#e74c3c;">📝 录入新异动</h3>
+                </div>
+                
+                <div style="padding:20px;">
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">1. 关联运单号：</label>
+                        <input type="text" id="reg_waybill" placeholder="例如：YD10086" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">2. 异常类型：</label>
+                        <select id="reg_type" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                            <option value="货物破损">📦 货物破损</option>
+                            <option value="货物丢失">❌ 货物丢失</option>
+                            <option value="时效延误">⏰ 时效延误</option>
+                            <option value="服务投诉">🤬 服务投诉</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">3. 责任判定 (谁负责)：</label>
+                        <input type="text" id="reg_liability" placeholder="例如：司机张三全责 / 承运商原因" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">4. 处罚/赔偿金额 (¥)：</label>
+                        <input type="number" id="reg_amount" placeholder="0.00" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:4px; font-size:16px; font-weight:bold; color:#c0392b;">
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">5. 详细描述/备注：</label>
+                        <textarea id="reg_desc" rows="2" placeholder="填写事故详情..." style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;"></textarea>
+                    </div>
+                </div>
+
+                <div style="padding:15px 20px; border-top:1px solid #eee; text-align:right; background:#f9f9f9; border-radius:0 0 8px 8px;">
+                    <button onclick="document.getElementById('registerModal').style.display='none'" style="padding:8px 15px; margin-right:10px; background:white; border:1px solid #ccc; cursor:pointer; border-radius:4px;">取消</button>
+                    <button class="btn-primary" onclick="saveNewAbnormal()" style="padding:8px 20px; border-radius:4px; background:#e74c3c;">确认录入</button>
+                </div>
+            </div>
+        </div>
+    `;
   }
 
   // =========================================================================
@@ -3065,7 +3113,9 @@ function loadContent(moduleCode, element = null) {
                         </tbody>
                     </table>
                 `;
-  } // =========================================================================
+} 
+
+  // =========================================================================
   // 20. 进项发票台账 (Tax Input Invoice)
   // =========================================================================
   else if (moduleCode === "TaxInputInvoice") {
@@ -3130,7 +3180,7 @@ function loadContent(moduleCode, element = null) {
                         </tbody>
                     </table>
                 `;
-  }
+}
 
   // =========================================================================
   // 21. 销项发票台账 (TaxOutputInvoice) - [最终联动版]
@@ -3443,7 +3493,8 @@ function loadContent(moduleCode, element = null) {
                         </tbody>
                     </table>
                 `;
-  } // =========================================================================
+  } 
+  // =========================================================================
   // 23. 预算编制 (Budget Planning)
   // =========================================================================
   else if (moduleCode === "BudgetPlanning") {
@@ -3647,7 +3698,8 @@ function loadContent(moduleCode, element = null) {
                         </tbody>
                     </table>
                 `;
-  } // =========================================================================
+  } 
+  // =========================================================================
   // 23. 预算编制 (Budget Planning)
   // =========================================================================
   else if (moduleCode === "BudgetPlanning") {
@@ -5072,7 +5124,8 @@ function loadContent(moduleCode, element = null) {
                                 <td>2024-01-01</td>
                                 <td>RMB</td>
                                 <td>2025年11期</td>
-                                <td><a href="#" style="color:#3498db;">设置</a> | <a href="#" style="color:#f39c12;">切换</a></td>
+                                <td>
+                                <a href="javascript:void(0)" onclick="loadContent('SettlementEngineConfig', this)">设置</a> | <a href="#" style="color:#f39c12;">切换</a></td>
                             </tr>
                             <tr>
                                 <td>002</td>
@@ -5080,7 +5133,8 @@ function loadContent(moduleCode, element = null) {
                                 <td>2025-01-01</td>
                                 <td>RMB</td>
                                 <td>2025年11期</td>
-                                <td><a href="#" style="color:#3498db;">设置</a> | <a href="#" style="color:#f39c12;">切换</a></td>
+                                <td>
+                                <a href="javascript:void(0)" onclick="loadContent('SettlementEngineConfig', this)">设置</a> | <a href="#" style="color:#f39c12;">切换</a></td>
                             </tr>
                         </tbody>
                     </table>
@@ -6542,7 +6596,6 @@ function loadContent(moduleCode, element = null) {
                         </label>
                         <div style="margin-left:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                             <label><input type="checkbox" class="perm-chk" value="treasury" ${isChecked('treasury')}> 收付款执行</label>
-                            <label><input type="checkbox" class="perm-chk" value="bank" ${isChecked('bank')}> 银企直联/对账</label>
                             <label><input type="checkbox" class="perm-chk" value="expense" ${isChecked('expense')}> 费用报销</label>
                             <label><input type="checkbox" class="perm-chk" value="approval" ${isChecked('approval')}> 资金审批</label>
                         </div>
@@ -8814,6 +8867,97 @@ function loadContent(moduleCode, element = null) {
   }
 
   // =========================================================================
+  // ★★★ [新增模块] 收支方式配置 (PaymentMethodConfig) ★★★
+  // =========================================================================
+  else if (moduleCode === "PaymentMethodConfig") {
+    
+    // 1. 初始化数据 (如果缓存为空)
+    let list = JSON.parse(sessionStorage.getItem('ConfigPaymentMethods') || "[]");
+    if (list.length === 0) {
+        list = [
+            { id: "PM001", name: "银行转账", type: "银行账户", status: "启用" },
+            { id: "PM002", name: "微信支付", type: "第三方平台", status: "启用" },
+            { id: "PM003", name: "支付宝", type: "第三方平台", status: "启用" },
+            { id: "PM004", name: "现金/支票", type: "线下", status: "停用" }
+        ];
+        sessionStorage.setItem('ConfigPaymentMethods', JSON.stringify(list));
+    }
+
+    // 2. 渲染表格行
+    const rows = list.map(item => {
+        let statusTag = item.status === '启用' 
+            ? `<span style="color:#27ae60; background:#eafaf1; padding:2px 6px; border-radius:4px;">✔ 启用</span>`
+            : `<span style="color:#999; background:#eee; padding:2px 6px; border-radius:4px;">⛔ 停用</span>`;
+
+        let actionBtn = item.status === '启用'
+            ? `<button class="btn-primary" style="background:#e74c3c; padding:2px 8px; font-size:12px;" onclick="toggleMethodStatus('${item.id}')">停用</button>`
+            : `<button class="btn-primary" style="background:#27ae60; padding:2px 8px; font-size:12px;" onclick="toggleMethodStatus('${item.id}')">启用</button>`;
+
+        return `
+            <tr>
+                <td>${item.id}</td>
+                <td><b>${item.name}</b></td>
+                <td>${item.type}</td>
+                <td>${statusTag}</td>
+                <td>
+                    ${actionBtn}
+                    <button class="btn-primary" style="background:#c0392b; padding:2px 8px; font-size:12px; margin-left:5px;" onclick="deleteMethod('${item.id}')">删除</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // 3. 拼接页面 HTML
+    contentHTML += `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding-bottom:15px; border-bottom:1px solid #eee;">
+            <div>
+                <h2 style="margin:0; color:#2c3e50;">💳 收支方式配置 (Payment Methods)</h2>
+                <p style="margin:5px 0 0 0; color:#7f8c8d; font-size:13px;">定义系统支持的付款和收款渠道，如银行卡、支付宝等。</p>
+            </div>
+            <div>
+                <button class="btn-primary" onclick="openPaymentMethodModal()">+ 新增方式</button>
+            </div>
+        </div>
+
+        <div style="background:white; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); padding:15px;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>编号</th><th>方式名称</th><th>类型</th><th>状态</th><th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+
+        <div id="pmModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999;">
+            <div style="position:absolute; top:20%; left:50%; transform:translateX(-50%); width:400px; background:white; border-radius:8px; box-shadow:0 5px 25px rgba(0,0,0,0.2); padding:20px;">
+                <h3 style="margin-top:0; color:#2980b9;">新增收支方式</h3>
+                
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">方式名称：</label>
+                    <input type="text" id="pm_name" placeholder="例如：招商银行9527" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">渠道类型：</label>
+                    <select id="pm_type" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                        <option value="银行账户">🏦 银行账户</option>
+                        <option value="第三方平台">📱 第三方平台 (微信/支付宝)</option>
+                        <option value="线下">💵 线下 (现金/支票)</option>
+                    </select>
+                </div>
+
+                <div style="text-align:right; margin-top:20px;">
+                    <button onclick="document.getElementById('pmModal').style.display='none'" style="padding:8px 15px; margin-right:10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer;">取消</button>
+                    <button class="btn-primary" onclick="savePaymentMethod()">确认保存</button>
+                </div>
+            </div>
+        </div>
+    `;
+  }
+
+  // =========================================================================
   // 90. 客户档案 (BaseCustomer) - [支持新增字段 & 数据持久化]
   // =========================================================================
   else if (moduleCode === "BaseCustomer") {
@@ -8928,20 +9072,229 @@ function loadContent(moduleCode, element = null) {
                         </tbody>
                     </table>
                 `;
-  } else {
-    contentHTML += `<p>已切换到 **${getModuleName(moduleCode)}** 模块。</p>
-                                <p>此处将加载该功能的详细操作界面，例如：</p>
-                                <ul>
-                                    <li>如果是 **报表**，则显示筛选条件和报表预览。</li>
-                                    <li>如果是 **录入**，则显示数据表单。</li>
-                                    <li>如果是 **查询**，则显示查询条件和数据列表。</li>
-                                </ul>
-                                <p style="color: #999;">（此为原型图模拟内容，请基于此结构进行后续的详细页面设计）</p>`;
-  }
+  } 
+
+// =========================================================================
+  // [2.0 版本] 会计引擎配置 - 树形导航 + 搜索
+  // =========================================================================
+// ★★★ 请将以下代码块插入到 view_manager.js 中 ★★★
+else if (moduleCode === 'SettlementEngineConfig') {
+    // 1. 检查 engine_config.js 是否已加载
+    if (typeof renderEngineTree === 'undefined') {
+        contentHTML += `
+            <div style="padding: 20px; color: red;">
+                错误：engine_config.js 未加载或 renderEngineTree 函数未定义。<br>
+                请检查 index.html 底部是否引入了 <script src="js/core/modules/finance/engine_config.js"></script>
+            </div>`;
+    }
+     else {
+        // 2. 渲染左右分栏布局
+        contentHTML += `
+            <style>
+                .engine-container { display: flex; height: calc(100vh - 140px); border: 1px solid #ddd; background: #fff; }
+                .engine-sidebar { width: 300px; background: #f8f9fa; border-right: 1px solid #ddd; overflow-y: auto; padding: 10px; }
+                .engine-content { flex: 1; padding: 20px; overflow-y: auto; }
+                .tree-node { cursor: pointer; padding: 6px 8px; border-radius: 4px; font-size: 13px; color: #333; }
+                .tree-node:hover { background-color: #e9ecef; }
+                .tree-node.active { background-color: #007bff; color: #fff; }
+                .level-1 { font-weight: bold; margin-top: 10px; font-size: 14px; }
+                .level-2 { margin-left: 15px; font-weight: bold; color: #555; margin-top: 5px; }
+                .level-3 { margin-left: 30px; font-weight: normal; border-left: 1px solid #eee; }
+                .config-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                .config-table th, .config-table td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+                .config-table th { background-color: #f1f1f1; font-weight: bold; }
+                .badge-debit { color: green; font-weight: bold; }
+                .badge-credit { color: red; font-weight: bold; }
+            </style>
+
+            <div class="engine-container">
+                <div class="engine-sidebar">
+                    ${renderEngineTree()} 
+                </div>
+                
+                <div class="engine-content" id="engine-content-area">
+                    <div style="text-align:center; margin-top: 100px; color:#999;">
+                        <p>⬅️ 请在左侧选择具体的费用类型</p>
+                        <p>以配置其会计分录生成规则</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
 
   // =========================================================================
   // 核心页面逻辑结束
   // =========================================================================
 
   contentArea.innerHTML = contentHTML;
+
+
+
+  // ============================================================
+//  以下是新增的“全流程联动控制台”逻辑 (适配你的 window.xxx 风格)
+// ============================================================
+
+/**
+ * 1. 渲染联动演示界面
+ * (替代之前的 renderLinkageDemo 类方法)
+ */
+window.renderLinkageDemo = function() {
+    // 获取主内容容器 (根据你之前的代码，通常是 main-content 或 app)
+    // 这里尝试获取你代码中常用的容器 ID，如果你的容器 ID 不叫 'content-area'，请修改这里
+    const container = document.querySelector('.main-content') || document.getElementById('content-area') || document.body;
+    
+    const html = `
+        <div class="demo-container" style="padding: 20px; display: flex; gap: 20px; font-family: 'Segoe UI', sans-serif;">
+            
+            <div class="panel" style="flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: #f9f9f9;">
+                <h3 style="margin-top:0; border-bottom: 2px solid #1890ff; padding-bottom: 10px;">Step 1: 模拟业务发生</h3>
+                <p style="color:#666; font-size:12px;">尝试修改下方单据信息，观察右侧变化</p>
+                
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>单据类型：</label>
+                    <input type="text" value="运单" disabled style="width:100px; background:#eee; border:1px solid #ccc;">
+                </div>
+
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>运单号：</label>
+                    <input type="text" id="demo_waybillNo" value="YD2025001" style="border:1px solid #1890ff; padding: 4px;">
+                    <div style="font-size:12px; color:green; margin-top:2px;">(影响摘要映射)</div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>支付方式：</label>
+                    <select id="demo_paymentType" style="border:1px solid #1890ff; padding: 4px;">
+                        <option value="现付">现付</option>
+                        <option value="月结">月结</option>
+                    </select>
+                    <div style="font-size:12px; color:red; margin-top:2px;">(影响记账规则)</div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>单据状态：</label>
+                    <select id="demo_status" style="border:1px solid #1890ff; padding: 4px;" onchange="window.toggleSettlementOption()">
+                        <option value="运输中">运输中</option>
+                        <option value="已签收">已签收 (触发挂账)</option>
+                        <option value="已结算">已结算 (触发结算)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>客户名称：</label>
+                    <input type="text" id="demo_clientName" value="顺丰速运" style="border:1px solid #1890ff; padding: 4px;">
+                    <div style="font-size:12px; color:blue; margin-top:2px;">(影响辅助核算)</div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>金额：</label>
+                    <input type="number" id="demo_amount" value="500" style="padding: 4px;">
+                </div>
+
+                <hr>
+                <div id="settlement_option" style="display:none; background:#fffbe6; padding:10px; border:1px solid #ffe58f;">
+                    <label>🔴 结算收支方式：</label>
+                    <select id="demo_pmId" style="padding: 4px;">
+                        <option value="pm_wx">微信支付</option>
+                        <option value="pm_cash">现金</option>
+                    </select>
+                    <div style="font-size:12px; color:#d48806;">(仅当触发结算规则时有效)</div>
+                </div>
+
+                <button onclick="window.runEngineDemo()" style="width:100%; margin-top:15px; background:#1890ff; color:white; border:none; padding:10px; cursor:pointer; font-size:16px; border-radius:4px;">🚀 生成凭证 (Run Engine)</button>
+            </div>
+
+            <div class="panel" style="flex: 1.2; border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: #fff;">
+                <h3 style="margin-top:0; border-bottom: 2px solid #52c41a; padding-bottom: 10px;">Step 2: 引擎执行过程</h3>
+                
+                <div id="engine_logs" style="background:#2b2b2b; color:#00ff00; padding:10px; font-family:monospace; height:200px; overflow-y:auto; border-radius:4px; font-size:12px; margin-bottom:15px;">
+                    Waiting for execution...
+                </div>
+
+                <h3 style="margin-top:0; border-bottom: 2px solid #faad14; padding-bottom: 10px;">Step 3: 最终生成凭证</h3>
+                <div id="voucher_result">
+                    <div style="text-align:center; color:#999; padding:20px;">暂无凭证数据</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+};
+
+/**
+ * 2. 辅助函数：切换结算选项显示状态
+ */
+window.toggleSettlementOption = function() {
+    const status = document.getElementById('demo_status').value;
+    const isSettle = status === '已结算';
+    document.getElementById('settlement_option').style.display = isSettle ? 'block' : 'none';
+};
+
+/**
+ * 3. 执行联动演示 (点击按钮触发)
+ */
+window.runEngineDemo = function() {
+    // 1. 收集表单数据
+    const doc = {
+        type: '运单',
+        waybillNo: document.getElementById('demo_waybillNo').value,
+        paymentType: document.getElementById('demo_paymentType').value,
+        status: document.getElementById('demo_status').value,
+        clientName: document.getElementById('demo_clientName').value,
+        orgName: '上海分公司',
+        amount: parseFloat(document.getElementById('demo_amount').value)
+    };
+    const pmId = document.getElementById('demo_pmId').value;
+
+    // 2. 确保引擎已加载
+    // 这里的 window.settlementSystem 需要在 settlement.js 里初始化
+    if (!window.settlementSystem || !window.settlementSystem.generateVoucherChain) {
+        // 如果找不到实例，尝试临时创建一个（为了防止报错卡住）
+        if (typeof SettlementSystem !== 'undefined') {
+            window.settlementSystem = new SettlementSystem();
+        } else {
+            alert("❌ 错误：settlement.js 中的引擎未加载，请确保 settlement.js 已引入页面。");
+            return;
+        }
+    }
+
+    // 3. 调用引擎
+    const result = window.settlementSystem.generateVoucherChain(doc, pmId);
+
+    // 4. 渲染日志
+    const logContainer = document.getElementById('engine_logs');
+    logContainer.innerHTML = result.logs.map(log => `<div>${log}</div>`).join('');
+
+    // 5. 渲染凭证结果
+    const voucherContainer = document.getElementById('voucher_result');
+    if (result.error) {
+        voucherContainer.innerHTML = `<div style="color:red; font-weight:bold; padding:10px; background:#fff1f0; border:1px solid #ffa39e;">${result.error}</div>`;
+    } else {
+        const entries = result.voucher.entries;
+        voucherContainer.innerHTML = `
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead style="background:#f0f2f5;">
+                    <tr><th>摘要</th><th>科目</th><th>辅助核算</th><th>借方</th><th>贷方</th></tr>
+                </thead>
+                <tbody>
+                    ${entries.map(e => `
+                        <tr style="border-bottom:1px solid #eee;">
+                            <td style="padding:8px;">${e.digest}</td>
+                            <td style="padding:8px;">${e.code}<br><span style="color:#999;font-size:10px;">${e.name}</span></td>
+                            <td style="padding:8px; color:blue;">${e.aux || '-'}</td>
+                            <td style="padding:8px; font-weight:bold; color:${e.debit?'green':''}">${e.debit||''}</td>
+                            <td style="padding:8px; font-weight:bold; color:${e.credit?'red':''}">${e.credit||''}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+};
+
 }
+
+
+
+
