@@ -28,7 +28,6 @@ function getModuleName(code) {
     // FundBankConnect: "银企直联",
     //FundClearingRule: "清分与分账规则",
     ExpenseLoan: "借款单",
-
     // ★★★ 在这里添加这一行 ★★★
     SettlementEngineConfig: "会计引擎配置",
     ExpenseRepay: "还款单",
@@ -5102,7 +5101,9 @@ function loadContent(moduleCode, element = null) {
                     </div>
                     
                     <div class="action-bar" style="margin-bottom: 15px;">
-                        <button class="btn-primary" style="background-color: #27ae60;">+ 新增会计账套</button>
+                        <button class="btn-primary" style="background-color: #27ae60;">+ 新增</button>
+                        <button class="btn-primary" style="background-color: #c4f329ff;">+ 复制</button>
+                        <button class="btn-primary" style="background-color: #860eefff;">+ 删除</button>
                     </div>
 
                     <h3>会计账套列表</h3>
@@ -5125,16 +5126,16 @@ function loadContent(moduleCode, element = null) {
                                 <td>RMB</td>
                                 <td>2025年11期</td>
                                 <td>
-                                <a href="javascript:void(0)" onclick="loadContent('SettlementEngineConfig', this)">设置</a> | <a href="#" style="color:#f39c12;">切换</a></td>
+                                <a href="javascript:void(0)" onclick="loadContent('SettlementEngineConfig', this)">设置</a> | <a href="#" style="color:#f39c12;">编辑</a> </td>
                             </tr>
                             <tr>
                                 <td>002</td>
-                                <td>华南子公司账套</td>
+                                <td>子公司账套</td>
                                 <td>2025-01-01</td>
                                 <td>RMB</td>
                                 <td>2025年11期</td>
                                 <td>
-                                <a href="javascript:void(0)" onclick="loadContent('SettlementEngineConfig', this)">设置</a> | <a href="#" style="color:#f39c12;">切换</a></td>
+                                <a href="javascript:void(0)" onclick="loadContent('SettlementEngineConfig', this)">设置</a> | <a href="#" style="color:#f39c12;">编辑</a> </td>
                             </tr>
                         </tbody>
                     </table>
@@ -6396,7 +6397,7 @@ function loadContent(moduleCode, element = null) {
                             <td style="padding:0 8px;">${subjectName}</td>
                             <td style="padding:0 8px; text-align:center;">${subjectCode}</td>
                             <td style="text-align:center;">${
-                              summary ? "√" : ""
+                              summary ? " " : ""
                             }</td>
                             <td class="money-grid-bg">${debitVal}</td>
                             <td class="money-grid-bg">${creditVal}</td>
@@ -6432,10 +6433,10 @@ function loadContent(moduleCode, element = null) {
             <table class="v-table">
                 <thead>
                     <tr>
-                        <th rowspan="2" style="width: 22%;">摘 要</th>
-                        <th rowspan="2" style="width: 18%;">总账科目</th>
+                        <th rowspan="2" style="width: 15%;">摘 要</th>
+                        <th rowspan="2" style="width: 15%;">总账科目</th>
                         <th rowspan="2" style="width: 15%;">明细科目</th>
-                        <th rowspan="2" style="width: 30px;">√</th>
+                        <th rowspan="2" style="width: 15%;">辅助项</th>
                         <th style="width: 20%;">借 方 金 额</th>
                         <th style="width: 20%;">贷 方 金 额</th>
                     </tr>
@@ -7102,7 +7103,7 @@ function loadContent(moduleCode, element = null) {
                                 <li>行2 (贷)：6001 主营业务收入 (金额 = 不含税金额)</li>
                                 <li>行3 (贷)：2221 应交税费-销项 (金额 = 税额)</li>
                             </ul>
-                            <p style="font-size:12px; color:#999;">(为简化原型，此处使用固定逻辑，实际开发需支持动态增减行)</p>
+                            <p style="font-size:12px; color:#999;">(需支持动态增减行)</p>
                         </div>
 
                         <div style="text-align:right;">
@@ -9127,7 +9128,7 @@ else if (moduleCode === 'SettlementEngineConfig') {
   // 核心页面逻辑结束
   // =========================================================================
 
-  contentArea.innerHTML = contentHTML;
+    contentArea.innerHTML = contentHTML;
 
 
 

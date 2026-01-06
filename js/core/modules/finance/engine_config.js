@@ -183,7 +183,7 @@ window.loadEngineConfig = function(itemName) {
         creditRowHTML = `
             <tr style="height: 45px; border-bottom: 1px solid #333;">
                 <td style="border-right: 1px solid #333; padding: 5px;">
-                    <input type="text" value="凭证摘要" style="width: 80%; border: none; outline: none;">
+                    <input type="text" value="" style="width: 80%; border: none; outline: none;">
                     <span style="font-size: 10px; color: #999; cursor:pointer;">✎</span>
                 </td>
                 <td style="border-right: 1px solid #333; padding: 5px; text-align: left;">
@@ -229,7 +229,7 @@ window.loadEngineConfig = function(itemName) {
                     <tbody>
                         <tr style="height: 45px; border-bottom: 1px solid #333;">
                             <td style="border-right: 1px solid #333; padding: 5px;">
-                                <input type="text" value="凭证摘要" style="width: 80%; border: none; outline: none;">
+                                <input type="text" value="" style="width: 80%; border: none; outline: none;">
                                 <span style="font-size: 10px; color: #999; cursor:pointer;">✎</span>
                             </td>
                             <td style="border-right: 1px solid #333; padding: 5px; text-align: left;">
